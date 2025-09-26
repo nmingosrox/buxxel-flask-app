@@ -1,0 +1,42 @@
+body {
+    background-color: #EAEDED;
+}
+
+.categories-bar {
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.categories-bar .container-fluid {
+    display: block; /* Override Bootstrap's flex for scrolling */
+}
+
+.categories-bar .btn {
+    margin-right: 8px;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.categories-bar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.categories-bar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.card-img-top {
+    height: 200px;
+    object-fit: cover;
+}
+
+.search-bar-custom {
+    width: 30vw;
+}
+
+/* Styles for cart item controls */
+.cart-item-quantity {
+    min-width: 20px;
+    text-align: center;
+}

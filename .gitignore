@@ -1,0 +1,11 @@
+# Environment variables - DO NOT UPLOAD!
+.env
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+
+# Virtual environment folders (if you use one)
+venv/
+.venv/
+env/
