@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buxxel - Developer Documentation</title>
+    <!-- Using the same Bootstrap version as the project for consistency -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+        }
+        #sidebar {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            width: 280px;
+            overflow-y: auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+        }
+        #main-content {
+            flex-grow: 1;
+            padding: 40px;
+            max-width: 960px;
+        }
+        section {
+            margin-bottom: 3rem;
+        }
+        .nav-link {
+            color: #495057;
+        }
+        .nav-link.active {
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        h2 {
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        code {
+            background-color: #e9ecef;
+            padding: .2em .4em;
+            border-radius: 3px;
+            font-size: 90%;
+        }
+        pre code {
+            display: block;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+<nav id="sidebar">
+    <h5>Buxxel Docs</h5>
+    <ul class="nav flex-column">
+        <li class="nav-item"><a class="nav-link" href="#overview">1. Project Overview</a></li>
+        <li class="nav-item"><a class="nav-link" href="#tech-stack">2. Tech Stack</a></li>
+        <li class="nav-item"><a class="nav-link" href="#project-structure">3. Project Structure</a></li>
+        <li class="nav-item"><a class="nav-link" href="#backend">4. Backend (Flask)</a>
+            <ul class="nav flex-column ms-3">
+                <li class="nav-item"><a class="nav-link" href="#backend-setup">4.1 Setup & Config</a></li>
+                <li class="nav-item"><a class="nav-link" href="#backend-pages">4.2 Page Routes</a></li>
+                <li class="nav-item"><a class="nav-link" href="#backend-api">4.3 API Routes</a></li>
+                <li class="nav-item"><a class="nav-link" href="#backend-auth">4.4 Authentication</a></li>
+                <li class="nav-item"><a class="nav-link" href="#backend-upload">4.5 File Uploads</a></li>
+            </ul>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="#frontend">5. Frontend (JS/HTML)</a>
+            <ul class="nav flex-column ms-3">
+                <li class="nav-item"><a class="nav-link" href="#frontend-auth">5.1 Auth Flow</a></li>
+                <li class="nav-item"><a class="nav-link" href="#frontend-listings">5.2 Listing Management</a></li>
+                <li class="nav-item"><a class="nav-link" href="#frontend-cart">5.3 Cart System</a></li>
+                <li class="nav-item"><a class="nav-link" href="#frontend-filtering">5.4 Filtering & Search</a></li>
+            </ul>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="#database">6. Database (Supabase)</a></li>
+        <li class="nav-item"><a class="nav-link" href="#testing">7. Testing</a></li>
+        <li class="nav-item"><a class="nav-link" href="#setup-guide">8. Local Setup Guide</a></li>
+    </ul>
+</nav>
+
+<main id="main-content">
+    <header class="mb-5">
+        <h1>Buxxel Developer Documentation</h1>
+        <p class="lead">A comprehensive guide to the Buxxel application architecture, code, and systems.</p>
+    </header>
+
+    <section id="overview">
+        <h2>1. Project Overview</h2>
+        <p>Buxxel is a web application that functions as a simple marketplace. Users can sign up, log in, post items (listings) for sale, and browse items posted by others. It features a client-side shopping cart and a user dashboard for managing personal listings.</p>
+        <p>The application is built with a Python Flask backend and a dynamic frontend using JavaScript (with jQuery) and Bootstrap. It uses <a href="https://supabase.com/" target="_blank">Supabase</a> for its database and authentication, and <a href="https://imagekit.io/" target="_blank">ImageKit.io</a> for media hosting and optimization.</p>
+    </section>
+
+    <section id="tech-stack">
+        <h2>2. Tech Stack</h2>
+        <ul>
+            <li><strong>Backend:</strong> Python 3, Flask</li>
+            <li><strong>Database &amp; Auth:</strong> Supabase (PostgreSQL, GoTrue)</li>
+            <li><strong>File Storage:</strong> <a href="https://imagekit.io/" target="_blank">ImageKit.io</a></li>
+            <li><strong>Frontend:</strong> HTML5, CSS3, JavaScript, jQuery, Bootstrap 5</li>
+            <li><strong>Python Libraries:</strong> <code>supabase-py</code>, <code>python-dotenv</code>, <code>Werkzeug</code>, <code>imagekitio</code></li>
+            <li><strong>JS Libraries:</strong> <code>supabase-js</code></li>
+            <li><strong>Testing:</strong> Pytest, <code>unittest.mock</code></li>
+        </ul>
+    </section>
+
+    <section id="project-structure">
+        <h2>3. Project Structure</h2>
+        <p>The project follows a standard Flask application layout.</p>
+        <pre><code>buxxel(python)/
+├── .env                # Stores secret keys (Supabase URL/Key). NOT committed to git.
+├── app.py              # The main Flask application file. Contains all backend logic.
+├── requirements.txt    # Python package dependencies.
+├── static/
+│   └── js/
+│       └── app.js      # Core frontend JavaScript for auth, cart, and filtering.
+├── templates/
+│   ├── layout.html     # Base template with navbar, footer, etc.
+│   ├── index.html      # Home page, displays all listings.
+│   ├── create_listing.html # Form for creating a new listing.
+│   ├── dashboard.html  # User's personal dashboard to manage their listings.
+│   └── edit_listing.html   # Form for editing an existing listing.
+└── tests/
+    └── test_app.py     # Unit tests for the Flask backend.
+</code></pre>
+    </section>
+
+    <section id="backend">
+        <h2>4. Backend (Flask - <code>app.py</code>)</h2>
+        <p><code>app.py</code> is the heart of the backend. It handles serving HTML pages, providing a JSON API, and communicating with Supabase.</p>
+
+        <h4 id="backend-setup">4.1 Setup &amp; Configuration</h4>
+        <p>The application starts by loading environment variables from a <code>.env</code> file using <code>python-dotenv</code>. It then initializes the clients for both Supabase (for the database) and ImageKit (for file storage).</p>
+        <pre><code># app.py
+load_dotenv()
+
+# Supabase Client
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
+
+# ImageKit Client
+imagekit = ImageKit(
+    public_key=os.environ.get("IMAGEKIT_PUBLIC_KEY"),
+    private_key=os.environ.get("IMAGEKIT_PRIVATE_KEY"),
+    url_endpoint=os.environ.get("IMAGEKIT_URL_ENDPOINT")
+)</code></pre>
+        <div class="alert alert-warning">
+            <strong>Important:</strong> The Supabase client is initialized with the <code>SUPABASE_KEY</code>, which is the <strong>service role key</strong>. This gives the backend admin-level privileges to bypass any Row Level Security (RLS) policies by default. This is necessary for some operations but requires careful handling, as explained in the <a href="#backend-upload">File Uploads</a> section.
+        </div>
+
+        <h4 id="backend-pages">4.2 Page-Rendering Routes</h4>
+        <p>These routes simply render and return HTML templates. They contain minimal logic.</p>
+        <ul>
+            <li><code>@app.route('/')</code>: Fetches all listings from the database and passes them to <code>index.html</code>. Includes error handling to prevent crashes if Supabase is unreachable.</li>
+            <li><code>@app.route('/new-listing')</code>: Renders the <code>create_listing.html</code> page.</li>
+            <li><code>@app.route('/dashboard')</code>: Renders the <code>dashboard.html</code> page.</li>
+            <li><code>@app.route('/edit-listing/&lt;id&gt;')</code>: Renders the <code>edit_listing.html</code> page, passing the <code>listing_id</code> to the template.</li>
+        </ul>
+
+        <h4 id="backend-api">4.3 API Routes</h4>
+        <p>These routes, prefixed with <code>/api</code>, handle data operations and return JSON. They are called by the frontend JavaScript.</p>
+        <ul>
+            <li><code>POST /api/listings</code>: Creates a new listing. This is a protected route.</li>
+            <li><code>GET /api/me/listings</code>: Fetches all listings belonging to the currently authenticated user. Protected route.</li>
+            <li><code>GET, PUT, DELETE /api/listings/&lt;id&gt;</code>: A multi-method route to get, update, or delete a specific listing. It's protected and also checks for ownership (the user can only modify their own listings).</li>
+        </ul>
+
+        <h4 id="backend-auth">4.4 Authentication</h4>
+        <p>All protected API routes follow the same authentication pattern:</p>
+        <ol>
+            <li>Extract the JWT from the <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
+            <li>Validate the token by calling <code>supabase.auth.get_user(jwt)</code>.</li>
+            <li>If the user object is returned, the request is authenticated. The <code>user.id</code> is then used in database queries to enforce ownership.</li>
+            <li>If no user is returned, the token is invalid or expired, and a <code>401 Unauthorized</code> error is sent.</li>
+        </ol>
+        <div class="alert alert-info">
+            <strong>Refactoring Opportunity:</strong> This repeated authentication logic is a prime candidate for a custom Flask decorator (e.g., <code>@auth_required</code>) to reduce code duplication and improve readability.
+        </div>
+
+        <h4 id="backend-upload">4.5 File Uploads (<code>upload_file_to_imagekit</code>)</h4>
+        <p>File uploads are handled by <a href="https://imagekit.io/" target="_blank">ImageKit.io</a>, a dedicated media hosting and optimization service. This approach is simpler and more scalable than the previous Supabase Storage implementation.</p>
+        <p>The <code>upload_file_to_imagekit</code> helper function uses the official <code>imagekitio</code> Python SDK. The process is straightforward:</p>
+        <ol>
+            <li>The backend receives the file from the user's form submission.</li>
+            <li>It calls <code>imagekit.upload()</code>, passing the file data and a unique filename. The SDK uses the secure <strong>private key</strong> (configured at startup) to authenticate with the ImageKit API.</li>
+            <li>ImageKit processes the file, stores it, and returns a public URL.</li>
+            <li>This URL is then saved in the <code>images</code> array in our Supabase <code>listings</code> table.</li>
+        </ol>
+        <p>This architecture decouples file storage from our main database provider, allowing us to leverage ImageKit's powerful features like automatic image optimization, a global CDN, and a more generous free tier for storage.</p>
+    </section>
+
+    <section id="frontend">
+        <h2>5. Frontend (JavaScript & HTML)</h2>
+        <p>The frontend is a "sprinkle of JavaScript" architecture, where jQuery is used to make the static HTML templates dynamic and interactive by calling the Flask API.</p>
+
+        <h4 id="frontend-auth">5.1 Authentication Flow (<code>static/js/app.js</code>)</h4>
+        <p>The frontend uses the <code>supabase-js</code> library for all authentication tasks.</p>
+        <ul>
+            <li><strong>State Management:</strong> The <code>updateAuthState</code> function is called on every page load. It uses <code>supabaseClient.auth.getSession()</code> to reliably check if a user is logged in. This method automatically handles refreshing expired tokens. Based on the session status, it shows/hides UI elements (e.g., "Login" vs. "Dashboard" buttons).</li>
+            <li><strong>Signup/Login:</strong> The forms in the auth modal call <code>supabaseClient.auth.signUp()</code> and <code>supabaseClient.auth.signInWithPassword()</code> respectively. The library handles the API calls to Supabase. After a successful login, the page is reloaded to reflect the new auth state.</li>
+            <li><strong>Logout:</strong> The logout button calls <code>supabaseClient.auth.signOut()</code> and reloads the page.</li>
+        </ul>
+
+        <h4 id="frontend-listings">5.2 Listing Management</h4>
+        <ul>
+            <li><strong>Create (<code>create_listing.html</code>):</strong> The form submission is intercepted by jQuery. A <code>FormData</code> object is created to hold both the text fields and the uploaded image files. An AJAX <code>POST</code> request is sent to <code>/api/listings</code>. The user's JWT is retrieved via <code>getSession()</code> and added to the <code>Authorization</code> header.</li>
+            <li><strong>Read (<code>dashboard.html</code>):</strong> On page load, an AJAX <code>GET</code> request is sent to <code>/api/me/listings</code> to fetch the user's listings. The results are then dynamically rendered into listing cards on the page.</li>
+            <li><strong>Delete (<code>dashboard.html</code>):</strong> The "Delete" button on each listing card triggers an AJAX <code>DELETE</code> request to <code>/api/listings/&lt;id&gt;</code>. On success, the corresponding card is removed from the DOM.</li>
+        </ul>
+
+        <h4 id="frontend-cart">5.3 Cart System (<code>static/js/app.js</code>)</h4>
+        <p>The shopping cart is implemented entirely on the client-side using <code>localStorage</code>.</p>
+        <ul>
+            <li><strong>Data Structure:</strong> The cart is a JavaScript object where keys are listing IDs and values are objects containing the item's <code>name</code>, <code>price</code>, and <code>quantity</code>.
+                <pre><code>// Example cart object in localStorage
+{
+  "101": { "name": "Apple", "price": 1.50, "quantity": 2 },
+  "105": { "name": "Bread", "price": 3.00, "quantity": 1 }
+}</code></pre>
+            </li>
+            <li><strong>Persistence:</strong> The <code>saveCart()</code> function is called after any modification (add, update, remove). It serializes the cart object to a JSON string and saves it to <code>localStorage</code> under the key <code>buxxelCart</code>.</li>
+            <li><strong>UI Updates:</strong> The <code>updateCart()</code> function reads the cart object, recalculates the total items and price, and re-renders the contents of the cart modal. It is the single source of truth for the cart's visual representation.</li>
+        </ul>
+
+        <h4 id="frontend-filtering">5.4 Filtering & Search (<code>static/js/app.js</code>)</h4>
+        <p>On the home page (<code>index.html</code>), users can filter the visible listings.</p>
+        <ul>
+            <li><strong>Category Filter:</strong> Clicking a category button uses jQuery to show/hide <code>.listing-card</code> elements based on their <code>data-category</code> attribute.</li>
+            <li><strong>Search Bar:</strong> The search input is debounced using a helper function. This prevents the filter from running on every single keystroke, improving performance. After a 300ms pause, it filters cards based on both the search term and the currently active category.</li>
+        </ul>
+    </section>
+
+    <section id="database">
+        <h2>6. Database (Supabase)</h2>
+        <p>The application relies on a single primary table in Supabase: <code>listings</code>.</p>
+        <h5><code>listings</code> Table Schema</h5>
+        <table class="table">
+            <thead>
+                <tr><th>Column</th><th>Type</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>id</code></td><td><code>bigint</code> (PK)</td><td>Auto-incrementing primary key.</td></tr>
+                <tr><td><code>created_at</code></td><td><code>timestamptz</code></td><td>Timestamp of creation.</td></tr>
+                <tr><td><code>name</code></td><td><code>text</code></td><td>Name of the product.</td></tr>
+                <tr><td><code>price</code></td><td><code>numeric</code></td><td>Price of the product.</td></tr>
+                <tr><td><code>category</code></td><td><code>text</code></td><td>Product category.</td></tr>
+                <tr><td><code>description</code></td><td><code>text</code></td><td>Detailed product description.</td></tr>
+                <tr><td><code>stock</code></td><td><code>integer</code></td><td>Available quantity.</td></tr>
+                <tr><td><code>user_id</code></td><td><code>uuid</code> (FK)</td><td>Foreign key referencing <code>auth.users.id</code>. Links listing to a user.</td></tr>
+                <tr><td><code>image_urls</code></td><td><code>text[]</code></td><td>An array of public URLs for the listing's images.</td></tr>
+            </tbody>
+        </table>
+
+        <h5>Row Level Security (RLS)</h5>
+        <p>RLS is a critical security feature in Supabase that is not visible in the application code but is essential for its integrity. You should have policies enabled on the <code>listings</code> table.</p>
+        <ul>
+            <li><strong>SELECT Policy:</strong> A permissive policy allowing anyone (<code>public</code>) to read all listings. This is for the home page.</li>
+            <li><strong>INSERT Policy:</strong> A policy allowing an authenticated user to insert a row, but only if the <code>user_id</code> in the new row matches their own ID (<code>auth.uid()</code>).</li>
+            <li><strong>UPDATE Policy:</strong> A policy allowing an authenticated user to update a row, but only if they are the owner of that row (<code>user_id = auth.uid()</code>).</li>
+            <li><strong>DELETE Policy:</strong> A policy allowing an authenticated user to delete a row, but only if they are the owner (<code>user_id = auth.uid()</code>).</li>
+        </ul>
+        <p>For a deep dive, refer to the <a href="https://supabase.com/docs/guides/auth/row-level-security" target="_blank">Supabase RLS Documentation</a>.</p>
+    </section>
+
+    <section id="testing">
+        <h2>7. Testing (<code>tests/test_app.py</code>)</h2>
+        <p>The project uses <code>pytest</code> for unit testing the Flask backend. The key principle is to <strong>isolate the application from external services</strong> like Supabase.</p>
+        <ul>
+            <li><strong>Mocking:</strong> <code>unittest.mock.patch</code> is used to replace the live <code>supabase</code> client object with a <code>MagicMock</code> object. This allows us to simulate Supabase responses (both success and failure) without making real network calls.</li>
+            <li><strong>Fixtures:</strong> Pytest fixtures (e.g., <code>client</code>, <code>mock_supabase</code>) are used to set up reusable test components, like the Flask test client and the mocked Supabase instance.</li>
+            <li><strong>Test Coverage:</strong> The tests cover:
+                <ul>
+                    <li>Successful API calls (the "happy path").</li>
+                    <li>Error conditions (e.g., invalid token, missing data, item not found).</li>
+                    <li>Authentication checks (e.g., requests with/without an auth header).</li>
+                    <li>Basic page rendering.</li>
+                </ul>
+            </li>
+        </ul>
+    </section>
+
+    <section id="setup-guide">
+        <h2>8. Local Setup Guide</h2>
+        
+        <h5>1. Prerequisites</h5>
+        <ul>
+            <li>Python 3.8+ and <code>pip</code> installed.</li>
+            <li>A <a href="https://supabase.com" target="_blank">Supabase</a> project. You will need the Project URL and the <code>service_role</code> key.</li>
+            <li>An <a href="https://imagekit.io" target="_blank">ImageKit.io</a> account. You will need your Public Key, Private Key, and URL-endpoint.</li>
+        </ul>
+
+        <h5>2. Clone & Install</h5>
+        <pre><code># Clone the repository
+git clone &lt;your-repo-url&gt;
+cd buxxel(python)
+
+# Create a virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt</code></pre>
+
+        <h5>3. Configure Environment</h5>
+        <p>Create a file named <code>.env</code> in the root directory and add your Supabase credentials:</p>
+        <pre><code># Supabase Credentials
+SUPABASE_URL="https://your-project-ref.supabase.co"
+SUPABASE_KEY="your-supabase-service-role-key"
+
+# ImageKit.io Credentials
+IMAGEKIT_PUBLIC_KEY="your_public_key"
+IMAGEKIT_PRIVATE_KEY="your_private_key"
+IMAGEKIT_URL_ENDPOINT="https://ik.imagekit.io/your_project/"</code></pre>
+
+        <h5>4. Set up Supabase</h5>
+        <ul>
+            <li>In your Supabase project, create the <code>listings</code> table using the schema defined <a href="#database">above</a>.</li>
+            <li>Enable Row Level Security on the <code>listings</code> table and add the policies described <a href="#database">above</a>.</li>
+        </ul>
+
+        <h5>5. Run the Application</h5>
+        <pre><code>flask run
+# Or for development with auto-reloading:
+flask --app app --debug run</code></pre>
+        <p>The application will be available at <code>http://127.0.0.1:5000</code>.</p>
+
+        <h5>6. Run Tests</h5>
+        <p>From the root directory, run:</p>
+        <pre><code>pytest -v</code></pre>
+    </section>
+
+</main>
+
+<script>
+    // Simple scrollspy-like functionality to highlight the current section in the sidebar
+    const sections = document.querySelectorAll('section');
+    const navLinks = document.querySelectorAll('#sidebar .nav-link');
+
+    window.addEventListener('scroll', () => {
+        let current = '';
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            if (pageYOffset >= sectionTop - 60) {
+                current = section.getAttribute('id');
+            }
+        });
+
+        navLinks.forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('href').includes(current)) {
+                link.classList.add('active');
+            }
+        });
+    });
+</script>
+
+</body>
+</html>

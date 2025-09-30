@@ -7,7 +7,7 @@
             <h2>Edit Your Listing</h2>
             <p>Update the details for your listing below.</p>
             <hr>
-            <form id="editListingForm">
+            <form id="editListingForm" enctype="multipart/form-data">
                 <div id="listing-alert" class="alert" role="alert" style="display: none;"></div>
                 <input type="hidden" id="listingId" value="{{ listing_id }}">
                 
@@ -39,8 +39,15 @@
                     <textarea class="form-control" id="listingDescription" rows="4" required></textarea>
                 </div>
                 <div class="mb-3">
-                    <label for="listingImage" class="form-label">Image URL</label>
-                    <input type="url" class="form-control" id="listingImage" placeholder="https://example.com/image.jpg" required>
+                    <label class="form-label">Current Images</label>
+                    <div id="current-images-container" class="d-flex flex-wrap gap-2 mb-2">
+                        <!-- Current images will be loaded here -->
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="newListingImages" class="form-label">Add New Images (optional)</label>
+                    <input type="file" class="form-control" id="newListingImages" name="new_images" multiple accept="image/*">
+                    <div class="form-text">You can have up to 4 images in total. Adding new images will append them to the existing ones.</div>
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Update Listing</button>
             </form>
@@ -52,39 +59,69 @@
 {% block page_scripts %}
 <script>
 $(document).ready(function() {
-    const session = JSON.parse(localStorage.getItem('supabaseSession'));
     const listingId = $('#listingId').val();
 
-    if (!session || !session.user) {
-        alert('You must be logged in to edit a listing. Redirecting to homepage.');
-        window.location.href = '/';
-        return;
+    // This function now uses the Supabase client to get the current, valid session.
+    // It will handle token refreshes automatically.
+    async function getSession() {
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error || !data.session) {
+            alert('Your session is invalid or has expired. Please log in again.');
+            window.location.href = '/';
+            return null;
+        }
+        return data.session;
     }
 
     // Fetch listing data to pre-fill the form
-    $.ajax({
-        url: `/api/listings/${listingId}`,
-        type: 'GET',
-        beforeSend: function(xhr) {
-            xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
-        },
-        success: function(listing) {
-            $('#listingName').val(listing.name);
-            $('#listingPrice').val(listing.price);
-            $('#listingStock').val(listing.stock);
-            $('#listingCategory').val(listing.category);
-            $('#listingImage').val(listing.image);
-            $('#listingDescription').val(listing.description);
-        },
-        error: function(xhr) {
-            const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'Could not load listing data.';
-            alert(errorMsg + ' Redirecting to dashboard.');
-            window.location.href = '/dashboard';
-        }
+    (async function() {
+        const session = await getSession();
+        if (!session) return;
+
+        $.ajax({
+            url: `/api/listings/${listingId}`,
+            type: 'GET',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
+            },
+            success: function(listing) {
+                $('#listingName').val(listing.name);
+                $('#listingPrice').val(listing.price);
+                $('#listingStock').val(listing.stock);
+                $('#listingCategory').val(listing.category);
+                $('#listingDescription').val(listing.description);
+
+                // Populate current images
+                const imagesContainer = $('#current-images-container');
+                imagesContainer.empty();
+                if (listing.image_urls && listing.image_urls.length > 0) {
+                    listing.image_urls.forEach(imageUrl => {
+                        const imagePill = `
+                            <div class="image-pill" data-url="${imageUrl}">
+                                <img src="${imageUrl}" alt="Listing image" height="50">
+                                <button type="button" class="btn-close btn-close-white remove-image-btn" aria-label="Remove"></button>
+                                <input type="hidden" name="existing_images" value="${imageUrl}">
+                            </div>
+                        `;
+                        imagesContainer.append(imagePill);
+                    });
+                }
+            },
+            error: function(xhr) {
+                const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'Could not load listing data.';
+                alert(errorMsg + ' Redirecting to dashboard.');
+                window.location.href = '/dashboard';
+            }
+        });
+    })();
+
+    // Handle removal of an existing image
+    $('#current-images-container').on('click', '.remove-image-btn', function() {
+        $(this).closest('.image-pill').remove();
     });
 
     // Handle form submission for updating
-    $('#editListingForm').on('submit', function(event) {
+    $('#editListingForm').on('submit', async function(event) {
         event.preventDefault();
 
         const form = $(this);
@@ -92,14 +129,33 @@ $(document).ready(function() {
         const originalBtnHtml = submitBtn.html();
         const alertDiv = $('#listing-alert');
 
-        const updatedData = {
-            name: $('#listingName').val(),
-            price: parseFloat($('#listingPrice').val()),
-            stock: parseInt($('#listingStock').val()),
-            category: $('#listingCategory').val(),
-            image: $('#listingImage').val(),
-            description: $('#listingDescription').val()
-        };
+        // Get the latest session right before making the API call
+        const session = await getSession();
+        if (!session) {
+            return; // Stop if session is invalid
+        }
+
+        const formData = new FormData(this);
+
+        // Check image count
+        const existingImageCount = formData.getAll('existing_images').length;
+        const newImageCount = $('#newListingImages')[0].files.length;
+        if (existingImageCount + newImageCount < 1 || existingImageCount + newImageCount > 4) {
+            alertDiv.text('You must have between 1 and 4 images in total.').removeClass('alert-success').addClass('alert-danger').show();
+            return;
+        }
+
+        // Manually append form fields that are not part of the FormData object by default
+        // if they are disabled or for some other reason. This ensures they are sent.
+        // Note: FormData(this) should capture all fields correctly, but this is a safeguard.
+        formData.set('name', $('#listingName').val());
+        formData.set('price', $('#listingPrice').val());
+        formData.set('stock', $('#listingStock').val());
+        formData.set('category', $('#listingCategory').val());
+        formData.set('description', $('#listingDescription').val());
+
+        // The 'existing_images' and 'new_images' are already in formData
+        // from the form constructor and file input.
 
         $.ajax({
             beforeSend: function(xhr) {
@@ -108,8 +164,9 @@ $(document).ready(function() {
             },
             url: `/api/listings/${listingId}`,
             type: 'PUT',
-            contentType: 'application/json',
-            data: JSON.stringify(updatedData),
+            data: formData,
+            processData: false,
+            contentType: false,
             success: function(response) {
                 alertDiv.text('Listing updated successfully! Redirecting...').removeClass('alert-danger').addClass('alert-success').show();
                 setTimeout(() => {

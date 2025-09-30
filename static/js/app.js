@@ -157,7 +157,7 @@ $(document).ready(function() {
     // --- AUTH FUNCTIONALITY ---
 
     // Signup Form Submission
-    $('#signupForm').on('submit', function(event) {
+    $('#signupForm').on('submit', async function(event) { // Make the handler async
         event.preventDefault();
 
         const form = $(this);
@@ -176,81 +176,59 @@ $(document).ready(function() {
             return;
         }
 
-        $.ajax({
-            beforeSend: function() {
-                submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Signing Up...');
-            },
-            url: '/signup',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ email, password }),
-            success: function(response) {
-                alertDiv.text(response.message).removeClass('alert-danger').addClass('alert-success').show();
-                // Reset form and close modal after a short delay
-                setTimeout(() => {
-                    $('#signupModal').modal('hide');
-                    $('#signupForm')[0].reset();
-                    alertDiv.hide().text('');
-                }, 3000);
-            },
-            error: function(xhr) {
-                const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'An unknown error occurred during signup.';
-                alertDiv.text(errorMsg).removeClass('alert-success').addClass('alert-danger').show();
-            },
-            complete: function() {
-                submitBtn.prop('disabled', false).html(originalBtnHtml);
-            }
-        });
+        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Signing Up...');
+
+        const { data, error } = await window.supabaseClient.auth.signUp({ email, password });
+
+        if (error) {
+            alertDiv.text(error.message).removeClass('alert-success').addClass('alert-danger').show();
+        } else {
+            alertDiv.text('Signup successful! Please check your email to verify your account.').removeClass('alert-danger').addClass('alert-success').show();
+            // Reset form and close modal after a short delay
+            setTimeout(() => {
+                $('#authModal').modal('hide');
+                $('#signupForm')[0].reset();
+                alertDiv.hide().text('');
+            }, 4000);
+        }
+        submitBtn.prop('disabled', false).html(originalBtnHtml);
     });
 
     // Login Form Submission
-    $('#loginForm').on('submit', function(event) {
+    $('#loginForm').on('submit', async function(event) { // Make the handler async
         event.preventDefault();
 
         const form = $(this);
         const submitBtn = form.find('button[type="submit"]');
         const originalBtnHtml = submitBtn.html();
         const alertDiv = $('#login-alert');
-        // The backend expects an email for password-based login.
         const email = $('#loginIdentifier').val();
         const password = $('#loginPassword').val();
 
-        $.ajax({
-            beforeSend: function() {
-                submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Logging In...');
-            },
-            url: '/login',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ email: email, password: password }),
-            success: function(response) {
-                alertDiv.text('Login successful! Reloading...').removeClass('alert-danger').addClass('alert-success').show();
-                
-                // Store session data in localStorage to persist login state
-                localStorage.setItem('supabaseSession', JSON.stringify(response));
+        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Logging In...');
 
-                // Reload the page to reflect the logged-in state after a short delay
-                setTimeout(() => {
-                    location.reload();
-                }, 1500);
-            },
-            error: function(xhr) {
-                const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'An unknown error occurred during login.';
-                alertDiv.text(errorMsg).removeClass('alert-success').addClass('alert-danger').show();
-            },
-            complete: function(xhr, textStatus) {
-                // Only restore the button if the request failed. On success, the page reloads.
-                if (textStatus !== 'success') {
-                    submitBtn.prop('disabled', false).html(originalBtnHtml);
-                }
-            }
-        });
+        const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
+
+        if (error) {
+            alertDiv.text(error.message).removeClass('alert-success').addClass('alert-danger').show();
+            submitBtn.prop('disabled', false).html(originalBtnHtml);
+        } else {
+            // The login was successful, simply reload the page.
+            // The updateAuthState function will handle the UI changes on page load.
+            location.reload();
+        }
     });
 
     // --- DYNAMIC AUTH STATE IN NAVBAR ---
 
-    function updateAuthState() {
-        const session = JSON.parse(localStorage.getItem('supabaseSession'));
+    async function updateAuthState() {
+        // Use the reliable getSession method to check auth state
+        const { data, error } = await window.supabaseClient.auth.getSession();
+        if (error) {
+            console.error("Error getting session:", error);
+            return;
+        }
+        const session = data.session;
         const createListingBtn = $('#create-listing-cta');
 
         if (session && session.user) {
@@ -284,15 +262,17 @@ $(document).ready(function() {
     }
 
     // Logout Button Handler
-    $('#logout-btn').on('click', function() {
-        // Simply remove the session from local storage
-        localStorage.removeItem('supabaseSession');
-        
-        // Show a quick feedback message (optional)
-        alert('You have been logged out.');
-
-        // Reload the page to reflect the new state
-        location.reload();
+    $('#logout-btn').on('click', async function() {
+        const { error } = await window.supabaseClient.auth.signOut();
+        if (error) {
+            console.error('Error logging out:', error);
+            alert('Failed to log out. Please try again.');
+        } else {
+            // Show a quick feedback message (optional)
+            alert('You have been logged out.');
+            // Reload the page to reflect the new state
+            location.reload();
+        }
     });
 
     // When the auth modal is closed, hide the contextual message so it doesn't show up next time

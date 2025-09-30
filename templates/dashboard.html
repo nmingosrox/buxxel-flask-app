@@ -37,71 +37,90 @@
 {% block page_scripts %}
 <script>
 $(document).ready(function() {
-    const session = JSON.parse(localStorage.getItem('supabaseSession'));
-
-    if (!session || !session.user) {
-        $('#guest-message').show();
-        $('#loading-spinner').hide();
-        return;
+    // This function now uses the Supabase client to get the current, valid session.
+    // It will handle token refreshes automatically.
+    async function getSession() {
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error || !data.session) {
+            // This is a guest user
+            return null;
+        }
+        return data.session;
     }
 
-    $('#dashboard-content').show();
+    // Main function to load the dashboard
+    async function loadDashboard() {
+        const session = await getSession();
 
-    // Fetch and display user's listings
-    $.ajax({
-        url: '/api/me/listings',
-        type: 'GET',
-        beforeSend: function(xhr) {
-            xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
-        },
-        success: function(listings) {
+        if (!session) {
+            $('#guest-message').show();
             $('#loading-spinner').hide();
-            const container = $('#my-listings-container');
-            if (listings.length === 0) {
-                $('#no-listings-message').show();
-                return;
-            }
+            return;
+        }
 
-            listings.forEach(listing => {
-                const listingCard = `
-                    <div class="card mb-3" id="listing-card-${listing.id}">
-                        <div class="row g-0">
-                            <div class="col-md-2">
-                                <img src="${listing.image}" class="img-fluid rounded-start" alt="${listing.name}" style="width: 100%; height: 150px; object-fit: cover;">
-                            </div>
-                            <div class="col-md-10">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between">
-                                        <div>
-                                            <h5 class="card-title">${listing.name}</h5>
-                                            <p class="card-text"><small class="text-muted">Category: ${listing.category} | Price: $${listing.price.toFixed(2)} | Stock: ${listing.stock}</small></p>
-                                        </div>
-                                        <div>
-                                            <a href="/edit-listing/${listing.id}" class="btn btn-outline-secondary btn-sm">Edit</a>
-                                            <button class="btn btn-outline-danger btn-sm delete-listing-btn" data-id="${listing.id}">Delete</button>
+        $('#dashboard-content').show();
+
+        // Fetch and display user's listings
+        $.ajax({
+            url: '/api/me/listings',
+            type: 'GET',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
+            },
+            success: function(listings) {
+                $('#loading-spinner').hide();
+                const container = $('#my-listings-container');
+                if (listings.length === 0) {
+                    $('#no-listings-message').show();
+                    return;
+                }
+
+                listings.forEach(listing => {
+                    // Use the first image from the 'image_urls' array
+                    const imageUrl = (listing.image_urls && listing.image_urls.length > 0) ? listing.image_urls[0] : 'https://via.placeholder.com/300x200.png?text=No+Image';
+                    const listingCard = `
+                        <div class="card mb-3" id="listing-card-${listing.id}">
+                            <div class="row g-0">
+                                <div class="col-md-2">
+                                    <img src="${imageUrl}" class="img-fluid rounded-start" alt="${listing.name}" style="width: 100%; height: 150px; object-fit: cover;">
+                                </div>
+                                <div class="col-md-10">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between">
+                                            <div>
+                                                <h5 class="card-title">${listing.name}</h5>
+                                                <p class="card-text"><small class="text-muted">Category: ${listing.category} | Price: $${listing.price.toFixed(2)} | Stock: ${listing.stock}</small></p>
+                                            </div>
+                                            <div>
+                                                <a href="/edit-listing/${listing.id}" class="btn btn-outline-secondary btn-sm">Edit</a>
+                                                <button class="btn btn-outline-danger btn-sm delete-listing-btn" data-id="${listing.id}">Delete</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                `;
-                container.append(listingCard);
-            });
-        },
-        error: function(xhr) {
-            $('#loading-spinner').hide();
-            alert('Failed to load your listings. Please try again.');
-        }
-    });
+                    `;
+                    container.append(listingCard);
+                });
+            },
+            error: function(xhr) {
+                $('#loading-spinner').hide();
+                alert('Failed to load your listings. Please try again.');
+            }
+        });
+    }
 
     // Handle delete button click
-    $('#my-listings-container').on('click', '.delete-listing-btn', function() {
+    $('#my-listings-container').on('click', '.delete-listing-btn', async function() {
         const listingId = $(this).data('id');
         
         if (!confirm('Are you sure you want to delete this listing? This action cannot be undone.')) {
             return;
         }
+
+        const session = await getSession();
+        if (!session) return;
 
         $.ajax({
             url: `/api/listings/${listingId}`,
@@ -120,6 +139,9 @@ $(document).ready(function() {
             }
         });
     });
+
+    // Run the main function on page load
+    loadDashboard();
 });
 </script>
 {% endblock %}

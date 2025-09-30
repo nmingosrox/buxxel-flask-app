@@ -7,7 +7,7 @@
             <h2>Create a New Listing</h2>
             <p>Fill out the form below to post a new item on Buxxel.</p>
             <hr>
-            <form id="createListingForm">
+            <form id="createListingForm" enctype="multipart/form-data">
                 <div id="listing-alert" class="alert" role="alert" style="display: none;"></div>
                 <div class="mb-3">
                     <label for="listingName" class="form-label">Listing Name</label>
@@ -37,8 +37,9 @@
                     <textarea class="form-control" id="listingDescription" rows="4" placeholder="Provide details about your item..." required></textarea>
                 </div>
                 <div class="mb-3">
-                    <label for="listingImage" class="form-label">Image URL</label>
-                    <input type="url" class="form-control" id="listingImage" placeholder="https://example.com/image.jpg" required>
+                    <label for="listingImages" class="form-label">Product Images (select 1 to 4)</label>
+                    <input type="file" class="form-control" id="listingImages" name="images" multiple accept="image/*" required>
+                    <div class="form-text">You can select up to 4 images. The first image selected will be the cover image.</div>
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Post Listing</button>
             </form>
@@ -50,16 +51,19 @@
 {% block page_scripts %}
 <script>
 $(document).ready(function() {
-    const session = JSON.parse(localStorage.getItem('supabaseSession'));
-
-    // If a guest somehow gets to this page, redirect them to the homepage.
-    if (!session || !session.user) {
-        alert('You must be logged in to create a listing. Redirecting to homepage.');
-        window.location.href = '/';
-        return;
+    // This function now uses the Supabase client to get the current, valid session.
+    // It will handle token refreshes automatically.
+    async function getSession() {
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error || !data.session) {
+            alert('Your session is invalid or has expired. Please log in again.');
+            window.location.href = '/';
+            return null;
+        }
+        return data.session;
     }
 
-    $('#createListingForm').on('submit', function(event) {
+    $('#createListingForm').on('submit', async function(event) { // Make the handler async
         event.preventDefault();
 
         const form = $(this);
@@ -67,27 +71,44 @@ $(document).ready(function() {
         const originalBtnHtml = submitBtn.html();
         const alertDiv = $('#listing-alert');
 
-        const listingData = {
-            name: $('#listingName').val(),
-            price: parseFloat($('#listingPrice').val()),
-            stock: parseInt($('#listingStock').val()),
-            category: $('#listingCategory').val(),
-            image: $('#listingImage').val(),
-            description: $('#listingDescription').val()
-        };
+        // Get the latest session right before making the API call
+        const session = await getSession();
+        if (!session) {
+            return; // Stop if session is invalid
+        }
+
+        const imageFiles = $('#listingImages')[0].files;
+        if (imageFiles.length < 1 || imageFiles.length > 4) {
+            alertDiv.text('Please select between 1 and 4 images.').removeClass('alert-success').addClass('alert-danger').show();
+            return;
+        }
+
+        // Use FormData to send both form fields and files
+        const formData = new FormData();
+        formData.append('name', $('#listingName').val());
+        formData.append('price', $('#listingPrice').val());
+        formData.append('stock', $('#listingStock').val());
+        formData.append('category', $('#listingCategory').val());
+        formData.append('description', $('#listingDescription').val());
+        
+        // Append all selected files
+        for (let i = 0; i < imageFiles.length; i++) {
+            formData.append('images', imageFiles[i]);
+        }
 
         $.ajax({
             beforeSend: function(xhr) {
                 submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Posting...');
-                // Set the Authorization header with the user's JWT
                 xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
             },
             url: '/api/listings',
             type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(listingData),
+            data: formData,
+            processData: false, // Important: prevent jQuery from processing the data
+            contentType: false, // Important: let the browser set the correct content type for multipart
             success: function(response) {
                 alertDiv.text('Listing created successfully! Redirecting...').removeClass('alert-danger').addClass('alert-success').show();
+                form[0].reset();
                 setTimeout(() => {
                     window.location.href = '/'; // Redirect to homepage
                 }, 2000);
@@ -95,12 +116,7 @@ $(document).ready(function() {
             error: function(xhr) {
                 const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'An error occurred.';
                 alertDiv.text(errorMsg).removeClass('alert-success').addClass('alert-danger').show();
-            },
-            complete: function() {
-                // Only restore button if it fails, on success we redirect
-                if (form.is(":visible")) {
-                    submitBtn.prop('disabled', false).html(originalBtnHtml);
-                }
+                submitBtn.prop('disabled', false).html(originalBtnHtml);
             }
         });
     });
