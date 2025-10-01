@@ -37,9 +37,9 @@
                     <textarea class="form-control" id="listingDescription" rows="4" placeholder="Provide details about your item..." required></textarea>
                 </div>
                 <div class="mb-3">
-                    <label for="listingImages" class="form-label">Product Images (select 1 to 4)</label>
-                    <input type="file" class="form-control" id="listingImages" name="images" multiple accept="image/*" required>
-                    <div class="form-text">You can select up to 4 images. The first image selected will be the cover image.</div>
+                    <label for="listingImage" class="form-label">Product Image</label>
+                    <input type="file" class="form-control" id="listingImage" name="image" accept="image/*" required>
+                    <div class="form-text">A single image is required for the listing.</div>
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Post Listing</button>
             </form>
@@ -77,9 +77,20 @@ $(document).ready(function() {
             return; // Stop if session is invalid
         }
 
-        const imageFiles = $('#listingImages')[0].files;
-        if (imageFiles.length < 1 || imageFiles.length > 4) {
-            alertDiv.text('Please select between 1 and 4 images.').removeClass('alert-success').addClass('alert-danger').show();
+        const imageFile = $('#listingImage')[0].files[0];
+
+        // --- Client-Side File Validation ---
+        if (!imageFile || imageFile.size === 0) {
+            alertDiv.text('Please select a valid image file.').removeClass('alert-success').addClass('alert-danger').show();
+            return;
+        }
+        if (!imageFile.type.startsWith('image/')) {
+            alertDiv.text('Invalid file type. Please upload an image (e.g., JPG, PNG, GIF).').removeClass('alert-success').addClass('alert-danger').show();
+            return;
+        }
+        const MAX_FILE_SIZE_MB = 5;
+        if (imageFile.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+            alertDiv.text(`File is too large. Maximum size is ${MAX_FILE_SIZE_MB} MB.`).removeClass('alert-success').addClass('alert-danger').show();
             return;
         }
 
@@ -90,11 +101,7 @@ $(document).ready(function() {
         formData.append('stock', $('#listingStock').val());
         formData.append('category', $('#listingCategory').val());
         formData.append('description', $('#listingDescription').val());
-        
-        // Append all selected files
-        for (let i = 0; i < imageFiles.length; i++) {
-            formData.append('images', imageFiles[i]);
-        }
+        formData.append('image', imageFile);
 
         $.ajax({
             beforeSend: function(xhr) {

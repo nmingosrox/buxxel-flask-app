@@ -105,7 +105,7 @@ class TestCreateListing:
         response = client.post(
             '/api/listings',
             headers=headers,
-            data={**form_data, 'images': [file]},
+            data={**form_data, 'image': file},
             content_type='multipart/form-data'
         )
 
@@ -142,22 +142,6 @@ class TestCreateListing:
         response = client.post('/api/listings', headers=headers, data={'name': 'Incomplete'})
         assert response.status_code == 400
         assert "Missing required listing data" in response.json['error']
-
-    def test_create_listing_invalid_image_count(self, client, mock_supabase, mock_user):
-        """Test create listing fails with zero or too many images."""
-        mock_supabase.auth.get_user.return_value = mock_user
-        headers = {'Authorization': 'Bearer fake-jwt'}
-        form_data = {
-            'name': 'New Gadget', 'price': '99.99', 'category': 'Electronics',
-            'description': 'A cool new gadget.', 'stock': '10'
-        }
-
-        # Test with zero images
-        response = client.post(
-            '/api/listings', headers=headers, data=form_data, content_type='multipart/form-data'
-        )
-        assert response.status_code == 400
-        assert "You must upload between 1 and 4 images" in response.json['error']
 
 class TestGetUserListings:
     """Tests for the GET /api/me/listings endpoint."""
@@ -245,24 +229,44 @@ class TestHandleListing:
         """Test PUT /api/listings/<id> success."""
         # Arrange
         mock_supabase.auth.get_user.return_value = mock_user
-        update_payload = {'name': 'Updated Name', 'price': 150.0}
+        update_payload = {
+            'name': 'Updated Name',
+            'price': '150.0',
+            'category': 'Electronics',
+            'description': 'Updated desc.',
+            'stock': '5',
+            'existing_image_url': 'http://example.com/image.jpg'
+        }
         mock_return_data = [{'id': 1, 'name': 'Updated Name', 'price': 150.0}]
         mock_supabase.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value.data = mock_return_data
 
         # Act
-        response = client.put('/api/listings/1', headers=auth_headers, json=update_payload)
+        response = client.put(
+            '/api/listings/1',
+            headers=auth_headers,
+            data=update_payload,
+            content_type='multipart/form-data'
+        )
 
         # Assert
         assert response.status_code == 200
         assert response.json['name'] == 'Updated Name'
-        mock_supabase.table('listings').update(update_payload).eq('id', 1).eq('user_id', 'user-uuid-123').execute.assert_called_once()
+        # Check that the update call was made with the correct data structure
+        update_call_args = mock_supabase.table.return_value.update.call_args[0][0]
+        assert update_call_args['name'] == 'Updated Name'
+        assert update_call_args['price'] == 150.0
 
     def test_update_listing_not_found(self, client, mock_supabase, mock_user, auth_headers):
         """Test PUT /api/listings/<id> when listing is not found or not owned."""
         mock_supabase.auth.get_user.return_value = mock_user
         mock_supabase.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value.data = None
 
-        response = client.put('/api/listings/99', headers=auth_headers, json={'name': 'new name'})
+        response = client.put(
+            '/api/listings/99',
+            headers=auth_headers,
+            data={'name': 'new name'},
+            content_type='multipart/form-data'
+        )
 
         assert response.status_code == 404
         assert "Update failed" in response.json['error']
@@ -271,10 +275,12 @@ class TestHandleListing:
         """Test PUT /api/listings/<id> with no update data."""
         mock_supabase.auth.get_user.return_value = mock_user
 
-        response = client.put('/api/listings/1', headers=auth_headers, json={})
+        response = client.put(
+            '/api/listings/1', headers=auth_headers, content_type='multipart/form-data'
+        )
 
         assert response.status_code == 400
-        assert "No update data provided" in response.json['error']
+        assert "Missing required listing data" in response.json['error']
 
     # --- DELETE ---
     def test_delete_listing_success(self, client, mock_supabase, mock_user, auth_headers):
@@ -308,7 +314,7 @@ class TestHandleListing:
         mock_supabase.auth.get_user.return_value.user = None
 
         get_response = client.get('/api/listings/1', headers=auth_headers)
-        put_response = client.put('/api/listings/1', headers=auth_headers, json={'name': 'test'})
+        put_response = client.put('/api/listings/1', headers=auth_headers, data={'name': 'test'})
         delete_response = client.delete('/api/listings/1', headers=auth_headers)
 
         assert get_response.status_code == 401

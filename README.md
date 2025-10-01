@@ -19,8 +19,8 @@ The application is built with a Python Flask backend and a dynamic frontend usin
 ### 2. Clone & Install
 
 ```bash
-# Clone the repository
-git clone <your-repo-url>
+# Clone this repository
+git clone https://github.com/nmingosrox/buxxel-flask-app.git
 cd buxxel(python)
 
 # Create a virtual environment (recommended)
