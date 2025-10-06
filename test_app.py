@@ -52,7 +52,7 @@ def test_home_supabase_error(client, mock_supabase):
 
 def test_simple_pages(client):
     """Test that simple template-rendering pages load correctly."""
-    pages = ['/new-listing', '/dashboard', '/edit-listing/1']
+    pages = ['/new-listing', '/dashboard']
     for page in pages:
         response = client.get(page)
         assert response.status_code == 200, f"Failed to load page: {page}"

@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import os
 from supabase import create_client, Client
+from functools import wraps
 from gotrue.errors import AuthApiError
 from dotenv import load_dotenv
 
@@ -28,32 +29,51 @@ if not UPLOADCARE_PUBLIC_KEY:
 
 # --- Custom Decorators ---
 def auth_required(f):
-    from functools import wraps
-    """A decorator to protect routes with JWT authentication."""
+    """
+    A decorator to protect routes with JWT authentication.
+    It expects a 'Bearer <token>' in the 'Authorization' header,
+    validates the token with Supabase, and passes the resulting user object to the decorated function.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({"error": "Authorization header is missing or invalid."}), 401
+        if not auth_header:
+            return jsonify({"error": "Authorization header is missing."}), 401
         
-        jwt = auth_header.split(' ')[1]
+        parts = auth_header.split()
+
+        if parts[0].lower() != 'bearer':
+            return jsonify({"error": "Authorization header must start with 'Bearer'."}), 401
+        elif len(parts) == 1:
+            return jsonify({"error": "Token not found after 'Bearer' scheme."}), 401
+        elif len(parts) > 2:
+            return jsonify({"error": "Authorization header must be 'Bearer <token>'."}), 401
+
+        jwt = parts[1]
         try:
             user_response = supabase.auth.get_user(jwt)
             user = user_response.user
             if not user:
+                # This case is hit if the token is validly structured but not recognized by Supabase (e.g., expired, invalid signature)
                 return jsonify({"error": "Invalid or expired token."}), 401
         except AuthApiError as e:
             return jsonify({"error": f"Authentication error: {e.message}"}), 401
-        except Exception:
-            # Catch other potential exceptions during token validation
-            return jsonify({"error": "Could not validate user token."}), 401
+        except Exception as e:
+            # Log the unexpected error for server-side debugging
+            app.logger.error(f"Unexpected error during token validation: {e}")
+            return jsonify({"error": "An unexpected error occurred during authentication."}), 500
 
         # Pass the user object to the decorated function
-        # This is stored in g (a request-specific global context) but passing as an arg is also common
-        # For simplicity here, we'll pass it as the first argument.
+        # as the first argument.
         return f(user, *args, **kwargs)
     return decorated_function
 # -------------------------
+
+# --- Template Context Processor ---
+@app.context_processor
+def inject_uploadcare_key():
+    """Injects the Uploadcare public key into all templates."""
+    return dict(uploadcare_public_key=UPLOADCARE_PUBLIC_KEY)
 
 @app.route('/')
 def home():
@@ -80,11 +100,6 @@ def new_listing_page():
 def dashboard_page():
     """Renders the user's dashboard page."""
     return render_template('dashboard.html')
-
-@app.route('/edit-listing/<int:listing_id>')
-def edit_listing_page(listing_id):
-    """Renders the page for editing a specific listing."""
-    return render_template('edit_listing.html', listing_id=listing_id, uploadcare_public_key=UPLOADCARE_PUBLIC_KEY)
 
 
 @app.route('/api/listings', methods=['POST'])
@@ -140,7 +155,7 @@ def get_user_listings(user):
     except Exception as e:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
-@app.route('/api/listings/<int:listing_id>', methods=['GET', 'PUT', 'DELETE'])
+@app.route('/api/listings/<listing_id>', methods=['GET', 'PUT', 'DELETE'])
 @auth_required
 def handle_listing(user, listing_id):
     """Handles fetching, updating, or deleting a single listing for the authenticated user."""
