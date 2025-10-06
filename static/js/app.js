@@ -219,6 +219,47 @@ $(document).ready(function() {
         }
     });
 
+    // --- Password Reset Flow ---
+
+    // 1. Show password reset form
+    $('#forgot-password-link').on('click', function(e) {
+        e.preventDefault();
+        $('#loginForm, #signup-view, hr.my-4').hide();
+        $('#password-reset-view').show();
+        $('#authModalLabel').text('Reset Password');
+    });
+
+    // 2. Go back to login from password reset
+    $('#back-to-login-link').on('click', function(e) {
+        e.preventDefault();
+        $('#password-reset-view').hide();
+        $('#loginForm, #signup-view, hr.my-4').show();
+        $('#authModalLabel').text('Login or Create an Account');
+    });
+
+    // 3. Handle the reset request form submission
+    $('#resetPasswordRequestForm').on('submit', async function(e) {
+        e.preventDefault();
+        const email = $('#resetEmail').val();
+        const alertDiv = $('#reset-request-alert');
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalBtnHtml = submitBtn.html();
+
+        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Sending...');
+
+        const { error } = await window.supabaseClient.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/reset-password`,
+        });
+
+        if (error) {
+            alertDiv.text(error.message).removeClass('alert-success').addClass('alert-danger').show();
+        } else {
+            alertDiv.text('Password reset link sent! Please check your email.').removeClass('alert-danger').addClass('alert-success').show();
+        }
+        submitBtn.prop('disabled', false).html(originalBtnHtml);
+    });
+
+
     // --- DYNAMIC AUTH STATE IN NAVBAR ---
 
     async function updateAuthState() {
@@ -278,6 +319,11 @@ $(document).ready(function() {
     // When the auth modal is closed, hide the contextual message so it doesn't show up next time
     $('#authModal').on('hidden.bs.modal', function () {
         $('#auth-context-message').hide().text('');
+        // Also reset the password form view
+        $('#password-reset-view').hide();
+        $('#loginForm, #signup-view, hr.my-4').show();
+        $('#authModalLabel').text('Login or Create an Account');
+        $('#reset-request-alert').hide().text('');
     });
 
     // Initial cart update on page load

@@ -88,28 +88,50 @@
                             <input type="password" class="form-control" id="loginPassword" required>
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Login</button>
+                        <div class="text-center mt-2">
+                            <a href="#" id="forgot-password-link" class="form-text">Forgot Password?</a>
+                        </div>
                     </form>
 
                     <hr class="my-4">
 
                     <!-- Signup Form -->
-                    <h6 class="mb-3">Don't have an account? Sign up below.</h6>
-                    <form id="signupForm">
-                        <div id="signup-alert" class="alert" role="alert" style="display: none;"></div>
-                        <div class="mb-3">
-                            <label for="signupEmail" class="form-label">Email address</label>
-                            <input type="email" class="form-control" id="signupEmail" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="signupPassword" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="signupPassword" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="confirmPassword" class="form-label">Confirm Password</label>
-                            <input type="password" class="form-control" id="confirmPassword" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Sign Up</button>
-                    </form>
+                    <div id="signup-view">
+                        <h6 class="mb-3">Don't have an account? Sign up below.</h6>
+                        <form id="signupForm">
+                            <div id="signup-alert" class="alert" role="alert" style="display: none;"></div>
+                            <div class="mb-3">
+                                <label for="signupEmail" class="form-label">Email address</label>
+                                <input type="email" class="form-control" id="signupEmail" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="signupPassword" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="signupPassword" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="confirmPassword" class="form-label">Confirm Password</label>
+                                <input type="password" class="form-control" id="confirmPassword" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Sign Up</button>
+                        </form>
+                    </div>
+
+                    <!-- Password Reset Request Form (Initially Hidden) -->
+                    <div id="password-reset-view" style="display: none;">
+                        <h6 class="mb-3">Reset Your Password</h6>
+                        <p class="form-text">Enter your email address and we will send you a link to reset your password.</p>
+                        <form id="resetPasswordRequestForm">
+                            <div id="reset-request-alert" class="alert" role="alert" style="display: none;"></div>
+                            <div class="mb-3">
+                                <label for="resetEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="resetEmail" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Send Reset Link</button>
+                            <div class="text-center mt-2">
+                                <a href="#" id="back-to-login-link" class="form-text">Back to Login</a>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

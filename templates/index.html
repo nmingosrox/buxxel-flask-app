@@ -66,8 +66,8 @@
                                     data-price="{{ listing.price }}">
                                 Add to Cart
                             </button>
-                            <button class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#contactModal">
-                                Contact Purveyor
+                            <a href="{{ url_for('profile_page', user_id=listing.user_id) }}" class="btn btn-outline-secondary w-100">
+                                View Profile
                             </button>
                         </div>
                     </div>
@@ -81,6 +81,21 @@
             <p class="text-muted">Please check back later or try a different category.</p>
         </div>
     {% endif %}
+
+    <!-- Pagination Controls -->
+    <nav aria-label="Page navigation" class="d-flex justify-content-center mt-5">
+        <ul class="pagination">
+            <li class="page-item {% if not has_prev %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('home', page=page-1) }}">Previous</a>
+            </li>
+            <li class="page-item active" aria-current="page">
+                <span class="page-link">{{ page }}</span>
+            </li>
+            <li class="page-item {% if not has_next %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('home', page=page+1) }}">Next</a>
+            </li>
+        </ul>
+    </nav>
 
     <!-- Purveyor CTA Section -->
     <section class="purveyor-cta my-5">

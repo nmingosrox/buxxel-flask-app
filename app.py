@@ -78,18 +78,33 @@ def inject_uploadcare_key():
 @app.route('/')
 def home():
     """Renders the home page by fetching listings from Supabase."""
+    # --- Pagination Logic ---
+    page = request.args.get('page', 1, type=int)
+    per_page = 12 # Show 12 listings per page
+    start_index = (page - 1) * per_page
+    end_index = start_index + per_page - 1
+
     try:
-        # Fetch data from the 'listings' table, ordered by id
+        # Fetch a paginated set of data from the 'listings' table
         print("Attempting to fetch listings from Supabase...")
-        response = supabase.table('listings').select("*").order('id').execute()
+        # We also fetch a count to determine total pages
+        response = supabase.table('listings').select("*", count='exact').order('id').range(start_index, end_index).execute()
         listings = response.data
-        print(f"✅ Successfully fetched {len(listings)} listings.")
-        return render_template('index.html', listings=listings)
+        total_listings = response.count
+
+        # Calculate pagination details
+        has_next = end_index < total_listings - 1
+        has_prev = page > 1
+        
+        print(f"✅ Successfully fetched {len(listings)} listings for page {page}.")
+        return render_template('index.html', listings=listings, 
+                               page=page, has_next=has_next, has_prev=has_prev)
+
     except Exception as e:
         print(f"❌ Failed to connect to Supabase or fetch listings: {e}")
         print("   Please check your .env file and Supabase table permissions.")
         # Render the page with an empty list so it doesn't crash
-        return render_template('index.html', listings=[])
+        return render_template('index.html', listings=[], page=1, has_next=False, has_prev=False)
 
 @app.route('/new-listing')
 def new_listing_page():
@@ -100,6 +115,59 @@ def new_listing_page():
 def dashboard_page():
     """Renders the user's dashboard page."""
     return render_template('dashboard.html')
+
+@app.route('/reset-password')
+def reset_password_page():
+    """Renders the page where users can set a new password."""
+    return render_template('reset_password.html')
+
+@app.route('/profile/<user_id>')
+def profile_page(user_id):
+    """Renders a public profile page for a given user, showing their active listings."""
+    purveyor_username = "Unknown Purveyor"
+    try:
+        # Fetch the public username from the 'profiles' table
+        profile_response = supabase.table('profiles').select("username").eq('id', user_id).single().execute()
+        
+        if profile_response.data and profile_response.data.get('username'):
+            purveyor_username = profile_response.data['username']
+        else:
+            # Fallback to a generic name if no username is set
+            purveyor_username = f"Purveyor #{user_id[:8]}"
+
+        # Fetch all active (stock > 0) listings for this user
+        listings_response = supabase.table('listings').select("*").eq('user_id', user_id).gt('stock', 0).order('created_at', desc=True).execute()
+        
+        listings = listings_response.data
+
+        return render_template('profile.html', listings=listings, purveyor_username=purveyor_username)
+
+    except Exception as e:
+        app.logger.error(f"Error loading profile page for {user_id}: {e}")
+        # Render a simple error state or redirect
+        return render_template('profile.html', listings=[], purveyor_username="Error", error="Could not load profile.")
+
+
+@app.route('/api/me/profile', methods=['GET', 'PUT'])
+@auth_required
+def handle_my_profile(user):
+    """Handles fetching or updating the authenticated user's profile."""
+    if request.method == 'GET':
+        try:
+            profile = supabase.table('profiles').select("username").eq('id', user.id).single().execute()
+            return jsonify(profile.data or {}), 200
+        except Exception as e:
+            return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+    if request.method == 'PUT':
+        data = request.get_json()
+        username = data.get('username')
+        if not username or len(username) < 3:
+            return jsonify({"error": "Username must be at least 3 characters long."}), 400
+        
+        update_data = {"username": username, "updated_at": "now()"}
+        response = supabase.table('profiles').update(update_data).eq('id', user.id).execute()
+        return jsonify(response.data[0]), 200
 
 
 @app.route('/api/listings', methods=['POST'])
@@ -132,7 +200,8 @@ def create_listing(user): # The user object is now passed by the decorator
             "category": data.get('category'),
             "image_urls": [image_url], # Store the single URL in an array to match the DB schema
             "description": data.get('description'),
-            "stock": stock,
+            "stock": stock, 
+            "pre_zero_stock": stock if stock > 0 else 1, # Initialize pre_zero_stock
             "user_id": user.id # Associate the listing with the logged-in user
         }
         
@@ -148,10 +217,83 @@ def create_listing(user): # The user object is now passed by the decorator
 @app.route('/api/me/listings', methods=['GET'])
 @auth_required
 def get_user_listings(user):
-    """Fetches all listings created by the currently authenticated user."""
+    """Fetches paginated and searchable listings for the currently authenticated user."""
+    page = request.args.get('page', 1, type=int)
+    search_term = request.args.get('search', '', type=str)
+    sort_by = request.args.get('sort_by', 'created_at', type=str)
+    sort_order = request.args.get('sort_order', 'desc', type=str)
+    per_page = 5 # A smaller number for the dashboard view
+    start_index = (page - 1) * per_page
+    end_index = start_index + per_page - 1
+
     try:
-        response = supabase.table('listings').select("*").eq('user_id', user.id).order('id').execute()
-        return jsonify(response.data), 200
+        # Whitelist sortable columns for security
+        allowed_sort_columns = ['created_at', 'name', 'price', 'stock']
+        if sort_by not in allowed_sort_columns:
+            sort_by = 'created_at'
+        
+        is_desc = sort_order.lower() == 'desc'
+
+        query = supabase.table('listings').select("*", count='exact').eq('user_id', user.id)
+
+        if search_term:
+            query = query.ilike('name', f'%{search_term}%')
+
+        # Fetch total count and a slice of data, ordered by most recent first
+        response = query.order(sort_by, desc=is_desc).range(start_index, end_index).execute()
+        
+        listings = response.data
+        total_listings = response.count
+
+        has_next = end_index < total_listings - 1
+
+        return jsonify({
+            "listings": listings,
+            "pagination": {
+                "page": page,
+                "has_next": has_next,
+                "total_listings": total_listings
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/api/listings/<listing_id>/status', methods=['PUT'])
+@auth_required
+def handle_listing_status(user, listing_id):
+    """Toggles the stock status of a listing for the authenticated user."""
+    data = request.get_json()
+    new_status = data.get('status')
+
+    if new_status not in ['in_stock', 'out_of_stock']:
+        return jsonify({"error": "Invalid status provided."}), 400
+
+    try:
+        # First, get the current listing to check ownership and current stock
+        listing_response = supabase.table('listings').select("stock, pre_zero_stock").eq('id', listing_id).eq('user_id', user.id).single().execute()
+        
+        if not listing_response.data:
+            return jsonify({"error": "Listing not found or you do not have permission."}), 404
+
+        current_listing = listing_response.data
+        update_data = {}
+
+        if new_status == 'out_of_stock':
+            # Only update pre_zero_stock if current stock is not already 0
+            if current_listing['stock'] > 0:
+                update_data['pre_zero_stock'] = current_listing['stock']
+            update_data['stock'] = 0
+        
+        elif new_status == 'in_stock':
+            # Restore to previous stock level, or 1 if not available
+            update_data['stock'] = current_listing.get('pre_zero_stock', 1) or 1
+
+        response = supabase.table('listings').update(update_data).eq('id', listing_id).execute()
+
+        if not response.data:
+            return jsonify({"error": "Failed to update listing status."}), 500
+        return jsonify(response.data[0]), 200
+
     except Exception as e:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 

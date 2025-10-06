@@ -17,8 +17,39 @@
         <p>You must be logged in to view your dashboard. Please <a href="#" data-bs-toggle="modal" data-bs-target="#authModal">log in</a>.</p>
     </div>
 
+    <!-- Profile Settings Section -->
+    <div id="profile-settings" style="display: none;">
+        <h4>Profile Settings</h4>
+        <form id="profileSettingsForm" class="row g-3 align-items-center mb-4">
+            <div class="col-md-5">
+                <label for="usernameInput" class="form-label">Public Username</label>
+                <input type="text" class="form-control" id="usernameInput" placeholder="Enter a public username">
+                <div class="form-text">This will be displayed on your public profile page.</div>
+            </div>
+            <div class="col-md-3 align-self-end">
+                <button type="submit" class="btn btn-secondary">Save Username</button>
+            </div>
+            <div id="profile-alert" class="col-12 mt-2" style="display: none;"></div>
+        </form>
+        <hr>
+    </div>
+
     <!-- Container for listings -->
     <div id="dashboard-content" style="display: none;">
+        <!-- Search and Sort Controls -->
+        <div class="row justify-content-between mb-4">
+            <div class="col-md-4">
+                <select class="form-select" id="dashboard-sort-select">
+                    <option value="created_at,desc" selected>Sort by: Newest</option>
+                    <option value="price,asc">Sort by: Price (Low to High)</option>
+                    <option value="price,desc">Sort by: Price (High to Low)</option>
+                    <option value="stock,asc">Sort by: Stock (Low to High)</option>
+                </select>
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" id="dashboard-search-bar" placeholder="Search your listings by name...">
+            </div>
+        </div>
         <div id="my-listings-container">
             <!-- Listings will be injected here -->
         </div>
@@ -31,6 +62,18 @@
             <h4 class="text-muted">You haven't posted any listings yet.</h4>
             <p class="text-muted">Click the "Add New Listing" button to get started.</p>
         </div>
+ 
+        <!-- Pagination Controls -->
+        <nav id="dashboard-pagination" aria-label="Dashboard navigation" class="d-flex justify-content-center mt-4" style="display: none !important;">
+            <ul class="pagination">
+                <li class="page-item" id="prev-page">
+                    <a class="page-link" href="#" aria-label="Previous">Previous</a>
+                </li>
+                <li class="page-item" id="next-page">
+                    <a class="page-link" href="#" aria-label="Next">Next</a>
+                </li>
+            </ul>
+        </nav>
     </div>
 </div>
 
@@ -91,6 +134,19 @@
 {% block page_scripts %}
 <script>
 $(document).ready(function() {    
+    // --- UTILITY FUNCTIONS ---
+
+    // Debounce function to limit the rate at which a function gets called.
+    function debounce(func, delay) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), delay);
+        };
+    }
+
+    let currentPage = 1;
+
     async function getSession() {
         const { data, error } = await supabaseClient.auth.getSession();
         if (error || !data.session) {
@@ -100,31 +156,46 @@ $(document).ready(function() {
         return data.session;
     }
 
-    async function loadDashboard() {
+    async function loadDashboard(page = 1, searchTerm = '', sortBy = 'created_at', sortOrder = 'desc') {
         const session = await getSession();
 
         if (!session) {
             $('#guest-message').show();
+            $('#profile-settings').hide();
             $('#loading-spinner').hide();
             return;
         }
 
         $('#dashboard-content').show();
+        $('#loading-spinner').show();
+        $('#my-listings-container').empty(); // Clear previous listings
+        $('#dashboard-pagination').hide();
 
         // Fetch and display user's listings
         $.ajax({
-            url: '/api/me/listings',
+            url: `/api/me/listings?page=${page}&search=${encodeURIComponent(searchTerm)}&sort_by=${sortBy}&sort_order=${sortOrder}`,
             type: 'GET',
             beforeSend: function(xhr) {
                 xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
             },
-            success: function(listings) {
+            success: function(response) {
                 $('#loading-spinner').hide();
                 const container = $('#my-listings-container');
-                if (listings.length === 0) {
+                const listings = response.listings;
+                const pagination = response.pagination;
+
+                currentPage = pagination.page;
+
+                if (listings.length === 0 && searchTerm.length === 0) {
+                    // Only show the "no listings" message if there's no search term
+                    $('#no-listings-message').show();
+                    return;
+                } else if (listings.length === 0 && searchTerm.length > 0) {
                     $('#no-listings-message').show();
                     return;
                 }
+
+                $('#no-listings-message').hide();
 
                 listings.forEach(listing => {
                     // Use the first image from the 'image_urls' array
@@ -148,13 +219,30 @@ $(document).ready(function() {
                     infoDiv.append($('<p>').addClass('card-text').append($('<small>').addClass('text-muted').text(smallText)));
 
                     const actionsDiv = $('<div>');
-                    // Change the edit link to a button that triggers the modal
+                    // Edit button
                     actionsDiv.append($('<button>')
                         .addClass('btn btn-outline-secondary btn-sm me-2 edit-listing-btn')
                         .attr('data-bs-toggle', 'modal').attr('data-bs-target', '#editListingModal')
                         .attr('data-listing-id', listing.id)
                         .text('Edit'));
-                    actionsDiv.append($('<button>').addClass('btn btn-outline-danger btn-sm delete-listing-btn').attr('data-id', listing.id).text('Delete'));
+
+                    // Status dropdown
+                    const statusDropdown = `
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm ${listing.stock > 0 ? 'btn-outline-success' : 'btn-outline-warning'} dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                ${listing.stock > 0 ? 'In Stock' : 'Out of Stock'}
+                            </button>
+                            <ul class="dropdown-menu">
+                                ${listing.stock > 0 
+                                    ? `<li><a class="dropdown-item status-toggle-btn" href="#" data-id="${listing.id}" data-status="out_of_stock">Mark as Out of Stock</a></li>`
+                                    : `<li><a class="dropdown-item status-toggle-btn" href="#" data-id="${listing.id}" data-status="in_stock">Mark as In Stock</a></li>`
+                                }
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger delete-listing-btn" href="#" data-id="${listing.id}">Delete Permanently</a></li>
+                            </ul>
+                        </div>
+                    `;
+                    actionsDiv.append(statusDropdown);
 
                     flexContainer.append(infoDiv, actionsDiv);
                     cardBody.append(flexContainer);
@@ -164,6 +252,19 @@ $(document).ready(function() {
 
                     container.append(card);
                 });
+
+                // Update and show pagination controls
+                if (pagination.page > 1 || pagination.has_next) {
+                    $('#dashboard-pagination').show();
+                    if (pagination.page > 1) {
+                        $('#prev-page').removeClass('disabled');
+                    } else {
+                        $('#prev-page').addClass('disabled');
+                    }
+                    $('#next-page').toggleClass('disabled', !pagination.has_next);
+                } else {
+                    $('#dashboard-pagination').hide();
+                }
             },
             error: function(xhr) {
                 $('#loading-spinner').hide();
@@ -172,8 +273,86 @@ $(document).ready(function() {
         });
     }
 
+    // Search bar handler
+    $('#dashboard-search-bar').on('keyup', debounce(function() {
+        const searchTerm = $(this).val();
+        const [sortBy, sortOrder] = $('#dashboard-sort-select').val().split(',');
+        loadDashboard(1, searchTerm, sortBy, sortOrder); // Always reset to page 1
+    }, 400)); // 400ms delay
+
+    // Sort dropdown handler
+    $('#dashboard-sort-select').on('change', function() {
+        const searchTerm = $('#dashboard-search-bar').val();
+        const [sortBy, sortOrder] = $(this).val().split(',');
+        loadDashboard(1, searchTerm, sortBy, sortOrder); // Always reset to page 1
+    });
+
+    // Pagination click handlers
+    $('#prev-page a').on('click', function(e) {
+        e.preventDefault();
+        const searchTerm = $('#dashboard-search-bar').val();
+        const [sortBy, sortOrder] = $('#dashboard-sort-select').val().split(',');
+        if (currentPage > 1) loadDashboard(currentPage - 1, searchTerm, sortBy, sortOrder);
+    });
+    $('#next-page a').on('click', function(e) {
+        e.preventDefault();
+        const searchTerm = $('#dashboard-search-bar').val();
+        const [sortBy, sortOrder] = $('#dashboard-sort-select').val().split(',');
+        loadDashboard(currentPage + 1, searchTerm, sortBy, sortOrder);
+    });
+
+    // --- PROFILE SETTINGS LOGIC ---
+
+    async function loadProfileSettings() {
+        const session = await getSession();
+        if (!session) return;
+
+        $('#profile-settings').show();
+
+        $.ajax({
+            url: '/api/me/profile',
+            type: 'GET',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
+            },
+            success: function(profile) {
+                if (profile && profile.username) {
+                    $('#usernameInput').val(profile.username);
+                }
+            }
+        });
+    }
+
+    $('#profileSettingsForm').on('submit', async function(e) {
+        e.preventDefault();
+        const session = await getSession();
+        if (!session) return;
+
+        const username = $('#usernameInput').val();
+        const alertDiv = $('#profile-alert');
+
+        $.ajax({
+            url: '/api/me/profile',
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({ username: username }),
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
+            },
+            success: function(response) {
+                alertDiv.html('<div class="alert alert-success">Username updated successfully!</div>').show().delay(3000).fadeOut();
+            },
+            error: function(xhr) {
+                const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'An error occurred.';
+                alertDiv.html(`<div class="alert alert-danger">${errorMsg}</div>`).show();
+            }
+        });
+    });
+
+
     // Handle delete button click
-    $('#my-listings-container').on('click', '.delete-listing-btn', async function() {
+    $('#my-listings-container').on('click', '.delete-listing-btn', async function(e) {
+        e.preventDefault();
         const listingId = $(this).data('id');
         const deleteBtn = $(this);
         
@@ -198,7 +377,11 @@ $(document).ready(function() {
                     $(this).remove(); 
                     // After removing, check if the container is empty.
                     if ($('#my-listings-container').children().length === 0) {
-                        $('#no-listings-message').show();
+                        // If we deleted the last item on a page, reload the current (or previous) page
+                        // to show the correct state or the "no listings" message.
+                        const searchTerm = $('#dashboard-search-bar').val();
+                        const [sortBy, sortOrder] = $('#dashboard-sort-select').val().split(',');
+                        loadDashboard(currentPage, searchTerm, sortBy, sortOrder);
                     }
                 });
             },
@@ -207,6 +390,45 @@ $(document).ready(function() {
                 alert(errorMsg);
                 // Re-enable the button on error
                 deleteBtn.prop('disabled', false).text('Delete');
+            }
+        });
+    });
+
+    // Handle status toggle button click
+    $('#my-listings-container').on('click', '.status-toggle-btn', async function(e) {
+        e.preventDefault();
+        const listingId = $(this).data('id');
+        const newStatus = $(this).data('status');
+        const statusBtn = $(this).closest('.btn-group').find('button').first();
+
+        const session = await getSession();
+        if (!session) return;
+
+        $.ajax({
+            url: `/api/listings/${listingId}/status`,
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({ status: newStatus }),
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
+                statusBtn.prop('disabled', true);
+            },
+            success: function(updatedListing) {
+                // --- Update the card UI in real-time ---
+                const card = $(`#listing-card-${listingId}`);
+                
+                // 1. Reload the entire card to update all elements (dropdown, text, etc.)
+                const searchTerm = $('#dashboard-search-bar').val();
+                const [sortBy, sortOrder] = $('#dashboard-sort-select').val().split(',');
+                // A small delay can make the UI feel smoother
+                setTimeout(() => {
+                    loadDashboard(currentPage, searchTerm, sortBy, sortOrder);
+                }, 300);
+            },
+            error: function(xhr) {
+                const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'Failed to update status.';
+                alert(errorMsg);
+                statusBtn.prop('disabled', false);
             }
         });
     });
@@ -316,6 +538,7 @@ $(document).ready(function() {
     });
 
     loadDashboard();
+    loadProfileSettings();
 });
 </script>
 {% endblock %}

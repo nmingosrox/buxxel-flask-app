@@ -230,7 +230,7 @@ UPLOADCARE_PUBLIC_KEY = os.environ.get("UPLOADCARE_PUBLIC_KEY")</code></pre>
 
     <section id="database">
         <h2>6. Database (Supabase)</h2>
-        <p>The application relies on a single primary table in Supabase: <code>listings</code>.</p>
+        <p>The application relies on two primary tables in Supabase: <code>listings</code> and <code>profiles</code>.</p>
         <h5><code>listings</code> Table Schema</h5>
         <table class="table">
             <thead>
@@ -245,9 +245,24 @@ UPLOADCARE_PUBLIC_KEY = os.environ.get("UPLOADCARE_PUBLIC_KEY")</code></pre>
                 <tr><td><code>description</code></td><td><code>text</code></td><td>Detailed product description.</td></tr>
                 <tr><td><code>stock</code></td><td><code>integer</code></td><td>Available quantity.</td></tr>
                 <tr><td><code>user_id</code></td><td><code>uuid</code> (FK)</td><td>Foreign key referencing <code>auth.users.id</code>. Links listing to a user.</td></tr>
+                <tr><td><code>pre_zero_stock</code></td><td><code>integer</code></td><td>Stores the stock count before an item is marked 'out of stock'. Defaults to 1.</td></tr>
                 <tr><td><code>image_urls</code></td><td><code>text[]</code></td><td>An array of public URLs for the listing's images.</td></tr>
             </tbody>
         </table>
+
+        <h5 class="mt-4"><code>profiles</code> Table Schema</h5>
+        <p>This table stores public user data and has a one-to-one relationship with the <code>auth.users</code> table.</p>
+        <table class="table">
+            <thead>
+                <tr><th>Column</th><th>Type</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>id</code></td><td><code>uuid</code> (PK, FK)</td><td>Primary key, references <code>auth.users.id</code>.</td></tr>
+                <tr><td><code>updated_at</code></td><td><code>timestamptz</code></td><td>Timestamp of the last update.</td></tr>
+                <tr><td><code>username</code></td><td><code>text</code></td><td>The user's unique, public username.</td></tr>
+            </tbody>
+        </table>
+        <p><strong>Constraint:</strong> The <code>username</code> column should have a <code>UNIQUE</code> constraint.</p>
 
         <h5>Row Level Security (RLS)</h5>
         <p>RLS is a critical security feature in Supabase that is not visible in the application code but is essential for its integrity. You should have policies enabled on the <code>listings</code> table.</p>
@@ -257,6 +272,31 @@ UPLOADCARE_PUBLIC_KEY = os.environ.get("UPLOADCARE_PUBLIC_KEY")</code></pre>
             <li><strong>UPDATE Policy:</strong> A policy allowing an authenticated user to update a row, but only if they are the owner of that row (<code>user_id = auth.uid()</code>).</li>
             <li><strong>DELETE Policy:</strong> A policy allowing an authenticated user to delete a row, but only if they are the owner (<code>user_id = auth.uid()</code>).</li>
         </ul>
+        <p>Similar policies should be applied to the <code>profiles</code> table:</p>
+        <ul>
+            <li><strong>SELECT Policy:</strong> A permissive policy allowing anyone to read all profiles.</li>
+            <li><strong>UPDATE Policy:</strong> A policy allowing a user to update their own profile (<code>id = auth.uid()</code>).</li>
+        </ul>
+
+        <h5 class="mt-4">Automatic Profile Creation</h5>
+        <p>To ensure every new user gets a profile entry, you should create a database function and a trigger in your Supabase SQL Editor.</p>
+        <pre><code>-- 1. Create the function
+create function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id)
+  values (new.id);
+  return new;
+end;
+$$;
+
+-- 2. Create the trigger
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();</code></pre>
         <p>For a deep dive, refer to the <a href="https://supabase.com/docs/guides/auth/row-level-security" target="_blank">Supabase RLS Documentation</a>.</p>
     </section>
 
