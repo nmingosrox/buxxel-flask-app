@@ -12,5 +12,5 @@ services:
         sync: false # Set this in the Render dashboard
       - key: UPLOADCARE_PUBLIC_KEY
         sync: false # Set this in the Render dashboard
-      - key: PYTHON_VERSION
-        value: 3.11 # Specify a Python version
+      - key: pythonVersion # Use the correct key for Render's native environment
+        value: "3.11"
