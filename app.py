@@ -1,11 +1,9 @@
 from flask import Flask, render_template, request, jsonify
 import os
 from supabase import create_client, Client
-from imagekitio import ImageKit
 from gotrue.errors import AuthApiError
 from dotenv import load_dotenv
 
-from helpers import upload_file_to_imagekit
 
 load_dotenv() # Load environment variables from .env file
 
@@ -20,19 +18,11 @@ if not url or not key:
 
 supabase: Client = create_client(url, key)
 
-# --- ImageKit Integration ---
-ik_public_key = os.environ.get("IMAGEKIT_PUBLIC_KEY")
-ik_private_key = os.environ.get("IMAGEKIT_PRIVATE_KEY")
-ik_url_endpoint = os.environ.get("IMAGEKIT_URL_ENDPOINT")
+# --- Uploadcare Integration ---
+UPLOADCARE_PUBLIC_KEY = os.environ.get("UPLOADCARE_PUBLIC_KEY")
 
-if not all([ik_public_key, ik_private_key, ik_url_endpoint]):
-    raise ValueError("IMAGEKIT_PUBLIC_KEY, IMAGEKIT_PRIVATE_KEY, and IMAGEKIT_URL_ENDPOINT must be set in the .env file.")
-
-imagekit = ImageKit(
-    public_key=ik_public_key,
-    private_key=ik_private_key,
-    url_endpoint=ik_url_endpoint
-)
+if not UPLOADCARE_PUBLIC_KEY:
+    raise ValueError("UPLOADCARE_PUBLIC_KEY must be set in the .env file.")
 
 # --------------------------
 
@@ -84,7 +74,7 @@ def home():
 @app.route('/new-listing')
 def new_listing_page():
     """Renders the page for creating a new listing."""
-    return render_template('create_listing.html')
+    return render_template('create_listing.html', uploadcare_public_key=UPLOADCARE_PUBLIC_KEY)
 
 @app.route('/dashboard')
 def dashboard_page():
@@ -94,7 +84,7 @@ def dashboard_page():
 @app.route('/edit-listing/<int:listing_id>')
 def edit_listing_page(listing_id):
     """Renders the page for editing a specific listing."""
-    return render_template('edit_listing.html', listing_id=listing_id)
+    return render_template('edit_listing.html', listing_id=listing_id, uploadcare_public_key=UPLOADCARE_PUBLIC_KEY)
 
 
 @app.route('/api/listings', methods=['POST'])
@@ -102,34 +92,31 @@ def edit_listing_page(listing_id):
 def create_listing(user): # The user object is now passed by the decorator
     """Creates a new listing in the database. This is a protected route."""
     try:
-        # Get data from multipart form instead of JSON
-        form_data = request.form
-        file = request.files.get('image') # 'image' is the new name for our single file input
+        # Get data from the form
+        data = request.form
+        image_url = data.get('image_url')
 
-        if not all([form_data.get('name'), form_data.get('price'), form_data.get('category'), form_data.get('description'), form_data.get('stock')]):
+        if not all([data.get('name'), data.get('price'), data.get('category'), data.get('description'), data.get('stock')]):
             return jsonify({"error": "Missing required listing data."}), 400
         
-        if not file:
+        if not image_url:
             return jsonify({"error": "An image is required for the listing."}), 400
         
         # --- Improved Validation ---
         try:
-            price = float(form_data.get('price'))
-            stock = int(form_data.get('stock'))
+            price = float(data.get('price'))
+            stock = int(data.get('stock'))
             if price < 0 or stock < 0:
                 return jsonify({"error": "Price and stock cannot be negative."}), 400
         except (ValueError, TypeError):
             return jsonify({"error": "Price and stock must be valid numbers."}), 400
 
-        # Upload the single image and get its URL
-        image_url = upload_file_to_imagekit(file)
-
         listing_data = {
-            "name": form_data.get('name'),
+            "name": data.get('name'),
             "price": price,
-            "category": form_data.get('category'),
+            "category": data.get('category'),
             "image_urls": [image_url], # Store the single URL in an array to match the DB schema
-            "description": form_data.get('description'),
+            "description": data.get('description'),
             "stock": stock,
             "user_id": user.id # Associate the listing with the logged-in user
         }
@@ -170,36 +157,29 @@ def handle_listing(user, listing_id):
 
         if request.method == 'PUT':
             # Update a listing. RLS policy will enforce ownership.
-            # Handles multipart/form-data
-            form_data = request.form
-            new_file = request.files.get('new_image')
-            existing_image_url = request.form.get('existing_image_url')
+            data = request.form
+            image_url = data.get('image_url')
 
             # --- Validation ---
-            if not all([form_data.get('name'), form_data.get('price'), form_data.get('category'), form_data.get('description'), form_data.get('stock')]):
+            if not all([data.get('name'), data.get('price'), data.get('category'), data.get('description'), data.get('stock')]):
                 return jsonify({"error": "Missing required listing data."}), 400
+            
+            if not image_url:
+                return jsonify({"error": "A listing image is required."}), 400
 
             try:
-                price = float(form_data.get('price'))
-                stock = int(form_data.get('stock'))
+                price = float(data.get('price'))
+                stock = int(data.get('stock'))
                 if price < 0 or stock < 0:
                     return jsonify({"error": "Price and stock cannot be negative."}), 400
             except (ValueError, TypeError):
                 return jsonify({"error": "Price and stock must be valid numbers."}), 400
 
-            # Determine the final image URL
-            if new_file:
-                image_url = upload_file_to_imagekit(new_file)
-            elif existing_image_url:
-                image_url = existing_image_url
-            else:
-                return jsonify({"error": "A listing image is required."}), 400
-
             update_data = {
-                "name": form_data.get('name'),
+                "name": data.get('name'),
                 "price": price,
-                "category": form_data.get('category'),
-                "description": form_data.get('description'),
+                "category": data.get('category'),
+                "description": data.get('description'),
                 "stock": stock,
                 "image_urls": [image_url] # Store as an array
             }
@@ -212,7 +192,12 @@ def handle_listing(user, listing_id):
 
         if request.method == 'DELETE':
             # Delete a listing. RLS policy will enforce ownership.
+            print(f"Attempting to delete listing {listing_id} for user {user.id}...")
             response = supabase.table('listings').delete().eq('id', listing_id).eq('user_id', user.id).execute()
+            
+            # --- DEBUG LOGGING ---
+            print(f"Supabase delete response: {response}")
+
             if not response.data:
                 return jsonify({"error": "Delete failed. Listing not found or you do not have permission."}), 404
             return jsonify({"message": "Listing deleted successfully."}), 200

@@ -92,7 +92,7 @@
     <section id="overview">
         <h2>1. Project Overview</h2>
         <p>Buxxel is a web application that functions as a simple marketplace. Users can sign up, log in, post items (listings) for sale, and browse items posted by others. It features a client-side shopping cart and a user dashboard for managing personal listings.</p>
-        <p>The application is built with a Python Flask backend and a dynamic frontend using JavaScript (with jQuery) and Bootstrap. It uses <a href="https://supabase.com/" target="_blank">Supabase</a> for its database and authentication, and <a href="https://imagekit.io/" target="_blank">ImageKit.io</a> for media hosting and optimization.</p>
+        <p>The application is built with a Python Flask backend and a dynamic frontend using JavaScript (with jQuery) and Bootstrap. It uses <a href="https://supabase.com/" target="_blank">Supabase</a> for its database and authentication, and <a href="https://uploadcare.com/" target="_blank">Uploadcare</a> for its file handling and CDN.</p>
     </section>
 
     <section id="tech-stack">
@@ -100,9 +100,9 @@
         <ul>
             <li><strong>Backend:</strong> Python 3, Flask</li>
             <li><strong>Database &amp; Auth:</strong> Supabase (PostgreSQL, GoTrue)</li>
-            <li><strong>File Storage:</strong> <a href="https://imagekit.io/" target="_blank">ImageKit.io</a></li>
+            <li><strong>File Handling & CDN:</strong> <a href="https://uploadcare.com/" target="_blank">Uploadcare</a></li>
             <li><strong>Frontend:</strong> HTML5, CSS3, JavaScript, jQuery, Bootstrap 5</li>
-            <li><strong>Python Libraries:</strong> <code>supabase-py</code>, <code>python-dotenv</code>, <code>Werkzeug</code>, <code>imagekitio</code></li>
+            <li><strong>Python Libraries:</strong> <code>supabase-py</code>, <code>python-dotenv</code>, <code>Werkzeug</code></li>
             <li><strong>JS Libraries:</strong> <code>supabase-js</code></li>
             <li><strong>Testing:</strong> Pytest, <code>unittest.mock</code></li>
         </ul>
@@ -111,7 +111,7 @@
     <section id="project-structure">
         <h2>3. Project Structure</h2>
         <p>The project follows a standard Flask application layout.</p>
-        <pre><code>buxxel(python)/
+        <pre><code>buxxel/
 ├── .env                # Stores secret keys (Supabase URL/Key). NOT committed to git.
 ├── app.py              # The main Flask application file. Contains all backend logic.
 ├── requirements.txt    # Python package dependencies.
@@ -134,7 +134,7 @@
         <p><code>app.py</code> is the heart of the backend. It handles serving HTML pages, providing a JSON API, and communicating with Supabase.</p>
 
         <h4 id="backend-setup">4.1 Setup &amp; Configuration</h4>
-        <p>The application starts by loading environment variables from a <code>.env</code> file using <code>python-dotenv</code>. It then initializes the clients for both Supabase (for the database) and ImageKit (for file storage).</p>
+        <p>The application starts by loading environment variables from a <code>.env</code> file using <code>python-dotenv</code>. It initializes the Supabase client and reads the Uploadcare public key.</p>
         <pre><code># app.py
 load_dotenv()
 
@@ -143,15 +143,8 @@ url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
 
-# ImageKit Client
-imagekit = ImageKit(
-    public_key=os.environ.get("IMAGEKIT_PUBLIC_KEY"),
-    private_key=os.environ.get("IMAGEKIT_PRIVATE_KEY"),
-    url_endpoint=os.environ.get("IMAGEKIT_URL_ENDPOINT")
-)</code></pre>
-        <div class="alert alert-warning">
-            <strong>Important:</strong> The Supabase client is initialized with the <code>SUPABASE_KEY</code>, which is the <strong>service role key</strong>. This gives the backend admin-level privileges to bypass any Row Level Security (RLS) policies by default. This is necessary for some operations but requires careful handling, as explained in the <a href="#backend-upload">File Uploads</a> section.
-        </div>
+# Uploadcare Public Key
+UPLOADCARE_PUBLIC_KEY = os.environ.get("UPLOADCARE_PUBLIC_KEY")</code></pre>
 
         <h4 id="backend-pages">4.2 Page-Rendering Routes</h4>
         <p>These routes simply render and return HTML templates. They contain minimal logic.</p>
@@ -179,19 +172,19 @@ imagekit = ImageKit(
             <li>If no user is returned, the token is invalid or expired, and a <code>401 Unauthorized</code> error is sent.</li>
         </ol>
         <div class="alert alert-info">
-            <strong>Refactoring Opportunity:</strong> This repeated authentication logic is a prime candidate for a custom Flask decorator (e.g., <code>@auth_required</code>) to reduce code duplication and improve readability.
+            <strong>Note:</strong> This authentication logic has been encapsulated in a custom <code>@auth_required</code> decorator to reduce code duplication and improve readability across protected routes.
         </div>
 
-        <h4 id="backend-upload">4.5 File Uploads (<code>upload_file_to_imagekit</code>)</h4>
-        <p>File uploads are handled by <a href="https://imagekit.io/" target="_blank">ImageKit.io</a>, a dedicated media hosting and optimization service. This approach is simpler and more scalable than the previous Supabase Storage implementation.</p>
-        <p>The <code>upload_file_to_imagekit</code> helper function uses the official <code>imagekitio</code> Python SDK. The process is straightforward:</p>
+        <h4 id="backend-upload">4.5 File Uploads with Uploadcare</h4>
+        <p>File uploads are handled by the <a href="https://uploadcare.com/" target="_blank">Uploadcare Widget</a> on the frontend. This greatly simplifies the backend logic.</p>
         <ol>
-            <li>The backend receives the file from the user's form submission.</li>
-            <li>It calls <code>imagekit.upload()</code>, passing the file data and a unique filename. The SDK uses the secure <strong>private key</strong> (configured at startup) to authenticate with the ImageKit API.</li>
-            <li>ImageKit processes the file, stores it, and returns a public URL.</li>
-            <li>This URL is then saved in the <code>images</code> array in our Supabase <code>listings</code> table.</li>
+            <li>The user interacts with the Uploadcare widget in their browser. The widget handles the entire upload process directly to Uploadcare's servers.</li>
+            <li>Once the upload is complete, the widget populates a hidden <code>&lt;input&gt;</code> field with the resulting file URL (a CDN link).</li>
+            <li>The frontend form is submitted to the Flask backend.</li>
+            <li>The backend simply retrieves the <code>image_url</code> from the form data like any other text field. It does not process any file data itself.</li>
+            <li>This URL is then saved in the <code>image_urls</code> array in our Supabase <code>listings</code> table.</li>
         </ol>
-        <p>This architecture decouples file storage from our main database provider, allowing us to leverage ImageKit's powerful features like automatic image optimization, a global CDN, and a more generous free tier for storage.</p>
+        <p>This architecture decouples file storage from our application server, improving performance and reliability. The backend is only responsible for handling the final URL.</p>
     </section>
 
     <section id="frontend">
@@ -208,7 +201,7 @@ imagekit = ImageKit(
 
         <h4 id="frontend-listings">5.2 Listing Management</h4>
         <ul>
-            <li><strong>Create (<code>create_listing.html</code>):</strong> The form submission is intercepted by jQuery. A <code>FormData</code> object is created to hold both the text fields and the uploaded image files. An AJAX <code>POST</code> request is sent to <code>/api/listings</code>. The user's JWT is retrieved via <code>getSession()</code> and added to the <code>Authorization</code> header.</li>
+            <li><strong>Create (<code>create_listing.html</code>):</strong> The form submission is intercepted by jQuery. It collects the values from the form fields, including the image URL from the hidden input populated by Uploadcare. An AJAX <code>POST</code> request is sent to <code>/api/listings</code> with the user's JWT in the <code>Authorization</code> header.</li>
             <li><strong>Read (<code>dashboard.html</code>):</strong> On page load, an AJAX <code>GET</code> request is sent to <code>/api/me/listings</code> to fetch the user's listings. The results are then dynamically rendered into listing cards on the page.</li>
             <li><strong>Delete (<code>dashboard.html</code>):</strong> The "Delete" button on each listing card triggers an AJAX <code>DELETE</code> request to <code>/api/listings/&lt;id&gt;</code>. On success, the corresponding card is removed from the DOM.</li>
         </ul>
@@ -290,14 +283,14 @@ imagekit = ImageKit(
         <h5>1. Prerequisites</h5>
         <ul>
             <li>Python 3.8+ and <code>pip</code> installed.</li>
-            <li>A <a href="https://supabase.com" target="_blank">Supabase</a> project. You will need the Project URL and the <code>service_role</code> key.</li>
-            <li>An <a href="https://imagekit.io" target="_blank">ImageKit.io</a> account. You will need your Public Key, Private Key, and URL-endpoint.</li>
+            <li>A <a href="https://supabase.com" target="_blank">Supabase</a> account. You will need the Project URL and the <code>service_role</code> key.</li>
+            <li>An <a href="https://uploadcare.com" target="_blank">Uploadcare</a> account. You will need your Public Key.</li>
         </ul>
 
         <h5>2. Clone & Install</h5>
         <pre><code># Clone the repository
 git clone &lt;your-repo-url&gt;
-cd buxxel(python)
+cd buxxel
 
 # Create a virtual environment (recommended)
 python -m venv venv
@@ -308,14 +301,11 @@ pip install -r requirements.txt</code></pre>
 
         <h5>3. Configure Environment</h5>
         <p>Create a file named <code>.env</code> in the root directory and add your Supabase credentials:</p>
-        <pre><code># Supabase Credentials
+        <pre><code># .env
 SUPABASE_URL="https://your-project-ref.supabase.co"
 SUPABASE_KEY="your-supabase-service-role-key"
 
-# ImageKit.io Credentials
-IMAGEKIT_PUBLIC_KEY="your_public_key"
-IMAGEKIT_PRIVATE_KEY="your_private_key"
-IMAGEKIT_URL_ENDPOINT="https://ik.imagekit.io/your_project/"</code></pre>
+UPLOADCARE_PUBLIC_KEY="your_uploadcare_public_key"</code></pre>
 
         <h5>4. Set up Supabase</h5>
         <ul>

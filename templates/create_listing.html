@@ -37,9 +37,13 @@
                     <textarea class="form-control" id="listingDescription" rows="4" placeholder="Provide details about your item..." required></textarea>
                 </div>
                 <div class="mb-3">
-                    <label for="listingImage" class="form-label">Product Image</label>
-                    <input type="file" class="form-control" id="listingImage" name="image" accept="image/*" required>
-                    <div class="form-text">A single image is required for the listing.</div>
+                    <label class="form-label">Product Image</label>
+                    <input type="hidden"
+                           role="uploadcare-uploader"
+                           data-public-key="{{ uploadcare_public_key }}"
+                           data-images-only="true"
+                           data-crop="free"
+                           id="uploadcare-widget" />
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Post Listing</button>
             </form>
@@ -77,31 +81,22 @@ $(document).ready(function() {
             return; // Stop if session is invalid
         }
 
-        const imageFile = $('#listingImage')[0].files[0];
+        // Get the image URL from the Uploadcare widget's value
+        const imageUrl = $('#uploadcare-widget').val();
 
-        // --- Client-Side File Validation ---
-        if (!imageFile || imageFile.size === 0) {
-            alertDiv.text('Please select a valid image file.').removeClass('alert-success').addClass('alert-danger').show();
-            return;
-        }
-        if (!imageFile.type.startsWith('image/')) {
-            alertDiv.text('Invalid file type. Please upload an image (e.g., JPG, PNG, GIF).').removeClass('alert-success').addClass('alert-danger').show();
-            return;
-        }
-        const MAX_FILE_SIZE_MB = 5;
-        if (imageFile.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-            alertDiv.text(`File is too large. Maximum size is ${MAX_FILE_SIZE_MB} MB.`).removeClass('alert-success').addClass('alert-danger').show();
+        if (!imageUrl) {
+            alertDiv.text('Please upload an image.').removeClass('alert-success').addClass('alert-danger').show();
             return;
         }
 
-        // Use FormData to send both form fields and files
-        const formData = new FormData();
-        formData.append('name', $('#listingName').val());
-        formData.append('price', $('#listingPrice').val());
-        formData.append('stock', $('#listingStock').val());
-        formData.append('category', $('#listingCategory').val());
-        formData.append('description', $('#listingDescription').val());
-        formData.append('image', imageFile);
+        const listingData = {
+            name: $('#listingName').val(),
+            price: $('#listingPrice').val(),
+            stock: $('#listingStock').val(),
+            category: $('#listingCategory').val(),
+            description: $('#listingDescription').val(),
+            image_url: imageUrl
+        };
 
         $.ajax({
             beforeSend: function(xhr) {
@@ -110,9 +105,7 @@ $(document).ready(function() {
             },
             url: '/api/listings',
             type: 'POST',
-            data: formData,
-            processData: false, // Important: prevent jQuery from processing the data
-            contentType: false, // Important: let the browser set the correct content type for multipart
+            data: listingData,
             success: function(response) {
                 alertDiv.text('Listing created successfully! Redirecting...').removeClass('alert-danger').addClass('alert-success').show();
                 form[0].reset();

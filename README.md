@@ -1,8 +1,8 @@
 # Buxxel Marketplace
 
-Buxxel is a web application that functions as a simple marketplace. Users can sign up, log in, post items (listings) for sale, and browse items posted by others. It uses [ImageKit.io](https://imagekit.io/) for optimized media hosting, features a client-side shopping cart, and a user dashboard for managing personal listings.
+Buxxel is a web application that functions as a simple marketplace. Users can sign up, log in, post items (listings) for sale, and browse items posted by others. It uses [Uploadcare](https://uploadcare.com/) for its file handling and CDN, features a client-side shopping cart, and a user dashboard for managing personal listings.
 
-The application is built with a Python Flask backend and a dynamic frontend using JavaScript (with jQuery) and Bootstrap. It uses [Supabase](https://supabase.com/) as its all-in-one backend-as-a-service for database, authentication, and file storage.
+The application is built with a Python Flask backend and a dynamic frontend using JavaScript (with jQuery) and Bootstrap. It uses [Supabase](https://supabase.com/) as its all-in-one backend-as-a-service for database and authentication.
 
 **For a complete breakdown of the project architecture, API endpoints, and code logic, please see the [Developer Documentation](developer_docs.html).**
 
@@ -14,14 +14,14 @@ The application is built with a Python Flask backend and a dynamic frontend usin
 
 *   Python 3.8+ and `pip` installed.
 *   A Supabase project. You will need the Project URL and the `service_role` key.
-*   An ImageKit.io account. You will need your Public Key, Private Key, and URL-endpoint.
+*   An Uploadcare account. You will need your Public Key.
 
 ### 2. Clone & Install
 
 ```bash
-# Clone this repository
-git clone https://github.com/nmingosrox/buxxel-flask-app.git
-cd buxxel(python)
+# Clone the repository
+git clone <your-repo-url>
+cd buxxel
 
 # Create a virtual environment (recommended)
 python -m venv venv
@@ -33,17 +33,15 @@ pip install -r requirements.txt
 
 ### 3. Configure Environment
 
-Create a file named `.env` in the root directory and add your Supabase credentials:
+Create a file named `.env` in the root directory and add your credentials:
 
 ```.env
 # Supabase Credentials
 SUPABASE_URL="https://your-project-ref.supabase.co"
 SUPABASE_KEY="your-supabase-service-role-key"
 
-# ImageKit.io Credentials
-IMAGEKIT_PUBLIC_KEY="your_public_key"
-IMAGEKIT_PRIVATE_KEY="your_private_key"
-IMAGEKIT_URL_ENDPOINT="https://ik.imagekit.io/your_project/"
+# Uploadcare Credentials
+UPLOADCARE_PUBLIC_KEY="your_uploadcare_public_key"
 ```
 
 ### 4. Set up Supabase

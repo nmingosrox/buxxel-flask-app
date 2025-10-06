@@ -1,15 +1,11 @@
 import pytest
 from unittest.mock import patch, MagicMock, ANY
 import os
-from werkzeug.datastructures import FileStorage
-from io import BytesIO
 
 # Set environment variables for testing before importing the app
 os.environ['SUPABASE_URL'] = 'http://test.supabase.co'
 os.environ['SUPABASE_KEY'] = 'test_key'
-os.environ['IMAGEKIT_PUBLIC_KEY'] = 'test_ik_public'
-os.environ['IMAGEKIT_PRIVATE_KEY'] = 'test_ik_private'
-os.environ['IMAGEKIT_URL_ENDPOINT'] = 'http://test.ik.co/buxxel'
+os.environ['UPLOADCARE_PUBLIC_KEY'] = 'test_uc_public'
 
 # It's important to import the app *after* the environment variables are set
 from app import app
@@ -26,12 +22,6 @@ def mock_supabase():
     """Fixture to mock the entire Supabase client."""
     with patch('app.supabase', autospec=True) as mock_sb:
         yield mock_sb
-
-@pytest.fixture
-def mock_upload_helper():
-    """Fixture to mock the upload_file_to_imagekit helper function."""
-    with patch('app.upload_file_to_imagekit', autospec=True) as mock_upload:
-        yield mock_upload
 
 def test_home_success(client, mock_supabase):
     """Test the home page successfully fetches and displays listings."""
@@ -79,11 +69,10 @@ class TestCreateListing:
         user_response.user = user
         return user_response
 
-    def test_create_listing_success(self, client, mock_supabase, mock_upload_helper, mock_user):
+    def test_create_listing_success(self, client, mock_supabase, mock_user):
         """Test successful creation of a new listing."""
         # Arrange
         mock_supabase.auth.get_user.return_value = mock_user
-        mock_upload_helper.return_value = "http://example.com/image.jpg"
         mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [{'id': 1, 'name': 'New Gadget'}]
 
         headers = {'Authorization': 'Bearer fake-jwt'}
@@ -92,28 +81,21 @@ class TestCreateListing:
             'price': '99.99',
             'category': 'Electronics',
             'description': 'A cool new gadget.',
-            'stock': '10'
+            'stock': '10',
+            'image_url': 'https://ucarecdn.com/some-uuid/image.jpg'
         }
-        # Create a mock file
-        file = FileStorage(
-            stream=BytesIO(b"fake image data"),
-            filename="photo1.jpg",
-            content_type="image/jpeg",
-        )
 
         # Act
         response = client.post(
             '/api/listings',
             headers=headers,
-            data={**form_data, 'image': file},
-            content_type='multipart/form-data'
+            data=form_data
         )
 
         # Assert
         assert response.status_code == 201
         assert response.json['name'] == 'New Gadget'
         mock_supabase.auth.get_user.assert_called_with('fake-jwt')
-        mock_upload_helper.assert_called_once_with(file)
         mock_supabase.table('listings').insert.assert_called_once()
 
     def test_create_listing_no_auth(self, client):
@@ -235,7 +217,7 @@ class TestHandleListing:
             'category': 'Electronics',
             'description': 'Updated desc.',
             'stock': '5',
-            'existing_image_url': 'http://example.com/image.jpg'
+            'image_url': 'http://example.com/new_image.jpg'
         }
         mock_return_data = [{'id': 1, 'name': 'Updated Name', 'price': 150.0}]
         mock_supabase.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value.data = mock_return_data
@@ -244,8 +226,7 @@ class TestHandleListing:
         response = client.put(
             '/api/listings/1',
             headers=auth_headers,
-            data=update_payload,
-            content_type='multipart/form-data'
+            data=update_payload
         )
 
         # Assert
@@ -264,8 +245,7 @@ class TestHandleListing:
         response = client.put(
             '/api/listings/99',
             headers=auth_headers,
-            data={'name': 'new name'},
-            content_type='multipart/form-data'
+            data={'name': 'new name', 'price': '1', 'stock': '1', 'category': 'c', 'description': 'd', 'image_url': 'url'}
         )
 
         assert response.status_code == 404
@@ -276,7 +256,7 @@ class TestHandleListing:
         mock_supabase.auth.get_user.return_value = mock_user
 
         response = client.put(
-            '/api/listings/1', headers=auth_headers, content_type='multipart/form-data'
+            '/api/listings/1', headers=auth_headers
         )
 
         assert response.status_code == 400
