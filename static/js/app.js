@@ -4,8 +4,9 @@ $(document).ready(function() {
 
     // --- CART FUNCTIONALITY ---
 
-    // 1. Add to Cart
-    $('.add-to-cart-btn').on('click', function() {
+    // 1. Add to Cart (using event delegation on a static parent)
+    // This ensures that buttons on newly loaded listings will also work.
+    $('#listing-grid').on('click', '.add-to-cart-btn', function() {
         const button = $(this);
         const id = button.data('id');
         const name = button.data('name');
@@ -102,6 +103,172 @@ $(document).ready(function() {
         }
     });
 
+    // --- PURVEYOR PROFILE MODAL ---
+    let purveyorButton = null;
+    let originalButtonHtml = '';
+
+    // Use event delegation for the "View Purveyor" button
+    $('#listing-grid').on('click', '.view-purveyor-btn', function() {
+        purveyorButton = $(this); // The button that was clicked
+        const userId = purveyorButton.data('user-id');
+        
+        // Get a jQuery object for the modal element
+        const modalElement = $('#purveyorProfileModal');
+        // The modal will be shown via the data-bs-toggle attribute on the button
+        // We just need to listen for the 'show' event to populate it.
+        
+        const contentArea = modalElement.find('#purveyor-profile-content');
+        const modalFooter = modalElement.find('.modal-footer');
+
+        // Give the button immediate feedback
+        originalButtonHtml = purveyorButton.html();
+        purveyorButton.prop('disabled', true).html(
+            `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...`
+        );
+
+        // 1. Show a loading spinner immediately
+        contentArea.html(`
+            <div class="text-center p-4">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        `);
+        modalFooter.hide(); // Hide footer while loading
+
+        // 2. Fetch the profile data from our new API endpoint
+        $.ajax({
+            url: `/api/profiles/${userId}`,
+            type: 'GET',
+            success: function(profile) {
+                // 3. Populate the modal with the fetched data
+                const profileHtml = `
+                    <div class="text-center">
+                        <i class="bi bi-shop-window fs-1 text-secondary mb-3"></i>
+                        <h4 class="mb-1">${profile.username}</h4>
+                        <p class="text-muted">Has ${profile.active_listings_count} active listings.</p>
+                        <hr>
+                        <p>What would you like to do?</p>
+                        <a href="/profile/${profile.user_id}" class="btn btn-primary w-100 mb-2">View All Listings by this Purveyor</a>
+                        <button class="btn btn-outline-secondary w-100" disabled>Contact Purveyor (Coming Soon)</button>
+                    </div>
+                `;
+                contentArea.html(profileHtml);
+                modalFooter.show(); // Show footer again
+            },
+            error: function() {
+                contentArea.html(`<div class="alert alert-danger">Could not load purveyor profile. Please try again later.</div>`);
+                modalFooter.show();
+            },
+            complete: function() {
+                // This runs after success or error. Restore the button here.
+                if (purveyorButton) {
+                    purveyorButton.prop('disabled', false).html(originalButtonHtml);
+                    purveyorButton = null;
+                }
+            }
+        });
+    });
+
+    // We no longer need the 'hidden.bs.modal' event handler for the button,
+    // as the 'complete' callback in the AJAX request now handles it reliably.
+
+    // --- DYNAMIC PAGINATION (INFINITE SCROLL) ---
+    const loadMoreContainer = document.getElementById('load-more-container');
+
+    function loadMoreListings(isNewFilter = false) {
+        const button = $('#load-more-btn');
+        if (button.prop('disabled') && !isNewFilter) return; // Don't load if already loading, unless it's a new filter
+
+        let nextPage;
+        if (isNewFilter) {
+            $('#listing-grid').empty(); // Clear the grid for new filter results
+            nextPage = 1;
+            button.data('next-page', 1); // Reset pagination
+        } else {
+            nextPage = button.data('next-page');
+        }
+
+        if (!nextPage) return;
+
+        const originalHtml = button.html();
+        button.prop('disabled', true).html(
+            `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...`
+        );
+
+        // Get current filter state
+        const activeCategory = $('.category-btn.active').data('category');
+        const searchTerm = $('#search-bar').val();
+
+        $.ajax({
+            url: `/api/listings/paged?page=${nextPage}&category=${activeCategory}&search=${encodeURIComponent(searchTerm)}`,
+            type: 'GET',
+            success: function(response) {
+                const listings = response.listings;
+                const pagination = response.pagination;
+
+                listings.forEach(listing => {
+                    const imageUrl = (listing.image_urls && listing.image_urls.length > 0) 
+                        ? listing.image_urls[0] 
+                        : 'https://via.placeholder.com/300x200.png?text=No+Image';
+                    const productCardHtml = `
+                        <div class="col-lg-3 col-md-4 col-sm-6 listing-card" data-category="${listing.category}" data-name="${listing.name.toLowerCase()}" data-image="${imageUrl}">
+                            <div class="card h-100 shadow-sm">
+                                <img src="${imageUrl}" class="card-img-top" alt="${listing.name}">
+                                <div class="card-body d-flex flex-column">
+                                    <h5 class="card-title">${listing.name}</h5>
+                                    <p class="card-text fw-bold fs-5 mb-3">$${listing.price.toFixed(2)}</p>
+                                    <div class="mt-auto">
+                                        <button class="btn btn-warning w-100 mb-2 add-to-cart-btn"
+                                                data-id="${listing.id}"
+                                                data-name="${listing.name}"
+                                                data-price="${listing.price}">
+                                            Add to Cart
+                                        </button>
+                                        <button class="btn btn-outline-secondary w-100 view-purveyor-btn"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#purveyorProfileModal"
+                                                data-user-id="${listing.user_id}">
+                                            View Purveyor
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                    $('#listing-grid').append(productCardHtml);
+                });
+
+                // If it was a new filter and no results came back, show a message.
+                if (isNewFilter && listings.length === 0) {
+                    $('#listing-grid').html('<div class="text-center p-5 col-12"><h4 class="text-muted">No listings match your filters.</h4></div>');
+                }
+
+                if (pagination.has_next) {
+                    button.data('next-page', pagination.page + 1);
+                    button.prop('disabled', false).html(originalHtml);
+                } else {
+                    button.hide();
+                    if (observer) {
+                        observer.disconnect(); // Stop observing if no more pages
+                    }
+                }
+            },
+            error: function() {
+                button.prop('disabled', false).html('Failed to load. Try again?');
+            }
+        });
+    }
+
+    if (loadMoreContainer && document.getElementById('load-more-btn')) {
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                loadMoreListings(false); // isNewFilter = false
+            }
+        }, { threshold: 1.0 }); // Trigger when 100% of the element is visible
+
+        observer.observe(loadMoreContainer);
+    }
+
     // --- UTILITY FUNCTIONS ---
 
     // Debounce function to limit the rate at which a function gets called.
@@ -123,35 +290,14 @@ $(document).ready(function() {
         $('.category-btn').removeClass('active');
         $(this).addClass('active');
 
-        if (category === 'all') {
-            $('.listing-card').show();
-        } else {
-            $('.listing-card').hide();
-            $(`.listing-card[data-category="${category}"]`).show();
-        }
-        // Reset search bar when changing category
-        $('#search-bar').val('');
+        // Instead of hiding/showing, fetch new filtered data
+        loadMoreListings(true); // isNewFilter = true
     });
 
     // 2. Search Bar Filter
     $('#search-bar').on('keyup', debounce(function() {
-        const searchTerm = $(this).val().toLowerCase();
-        const activeCategory = $('.category-btn.active').data('category');
-
-        $('.listing-card').each(function() {
-            const card = $(this);
-            const listingName = card.data('name').toLowerCase();
-            const listingCategory = card.data('category');
-
-            const isNameMatch = listingName.includes(searchTerm);
-            const isCategoryMatch = (activeCategory === 'all' || listingCategory === activeCategory);
-
-            if (isNameMatch && isCategoryMatch) {
-                card.show();
-            } else {
-                card.hide();
-            }
-        });
+        // Fetch new filtered data
+        loadMoreListings(true); // isNewFilter = true
     }, 300)); // 300ms delay
 
     // --- AUTH FUNCTIONALITY ---

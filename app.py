@@ -169,6 +169,73 @@ def handle_my_profile(user):
         response = supabase.table('profiles').update(update_data).eq('id', user.id).execute()
         return jsonify(response.data[0]), 200
 
+@app.route('/api/listings/paged', methods=['GET'])
+def get_paged_listings():
+    """
+    API endpoint to fetch paginated listings as JSON.
+    This is used for dynamic 'load more' functionality.
+    """
+    page = request.args.get('page', 1, type=int)
+    category = request.args.get('category', None, type=str)
+    search_term = request.args.get('search', None, type=str)
+    per_page = 12
+    start_index = (page - 1) * per_page
+    end_index = start_index + per_page - 1
+
+    try:
+        query = supabase.table('listings').select("*", count='exact')
+
+        # Apply filters if they are provided
+        if category and category != 'all':
+            query = query.eq('category', category)
+        
+        if search_term:
+            query = query.ilike('name', f'%{search_term}%')
+
+        # Apply ordering and pagination to the filtered query
+        response = query.order('id').range(start_index, end_index).execute()
+        listings = response.data
+        total_listings = response.count
+
+        has_next = end_index < total_listings - 1
+
+        return jsonify({
+            "listings": listings,
+            "pagination": {
+                "page": page,
+                "has_next": has_next
+            }
+        }), 200
+    except Exception as e:
+        app.logger.error(f"Error fetching paged listings: {e}")
+        return jsonify({"error": "Failed to load listings."}), 500
+
+@app.route('/api/profiles/<user_id>', methods=['GET'])
+def get_public_profile(user_id):
+    """Fetches public profile data for a given user ID."""
+    try:
+        # Fetch the public username
+        profile_res = supabase.table('profiles').select("username").eq('id', user_id).single().execute()
+        
+        if not profile_res.data:
+            return jsonify({"error": "Purveyor not found."}), 404
+
+        username = profile_res.data.get('username') or f"Purveyor #{user_id[:8]}"
+
+        # Fetch the count of active listings
+        listings_count_res = supabase.table('listings').select("id", count='exact').eq('user_id', user_id).gt('stock', 0).execute()
+        active_listings_count = listings_count_res.count
+
+        profile_data = {
+            "user_id": user_id,
+            "username": username,
+            "active_listings_count": active_listings_count
+        }
+
+        return jsonify(profile_data), 200
+    except Exception as e:
+        app.logger.error(f"Error fetching public profile for {user_id}: {e}")
+        return jsonify({"error": "An unexpected error occurred."}), 500
 
 @app.route('/api/listings', methods=['POST'])
 @auth_required
