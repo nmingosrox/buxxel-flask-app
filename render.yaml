@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: buxxel
+    env: python
+    plan: free # Or "starter" if you need more resources
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: SUPABASE_URL
+        sync: false # Set this in the Render dashboard
+      - key: SUPABASE_KEY
+        sync: false # Set this in the Render dashboard
+      - key: UPLOADCARE_PUBLIC_KEY
+        sync: false # Set this in the Render dashboard
+      - key: PYTHON_VERSION
+        value: 3.11 # Specify a Python version
