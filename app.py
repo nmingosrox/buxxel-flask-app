@@ -259,11 +259,16 @@ def create_listing(user): # The user object is now passed by the decorator
         # Convert comma-separated string into a list of clean, lowercase tags
         tags = [tag.strip().lower() for tag in tags_str.split(',') if tag.strip()]
 
+        # To satisfy the database's NOT NULL constraint on 'category',
+        # we'll use the first tag as the primary category. If no tags, default to 'general'.
+        primary_category = tags[0] if tags else 'general'
+
         listing_data = {
             "name": data.get('name'),
             "price": price,
             "image_urls": [url.strip() for url in image_urls_str.split(',')], # Split string into a list of URLs
             "tags": tags,
+            "category": primary_category,
             "description": data.get('description'),
             "stock": stock, 
             "pre_zero_stock": stock if stock > 0 else 1, # Initialize pre_zero_stock
@@ -428,11 +433,15 @@ def handle_listing(user, listing_id):
             # Convert comma-separated string into a list of clean, lowercase tags
             tags = [tag.strip().lower() for tag in tags_str.split(',') if tag.strip()]
 
+            # Use the first tag as the primary category, or a default if none are provided.
+            primary_category = tags[0] if tags else 'general'
+
             update_data = {
                 "name": data.get('name'),
                 "price": price,
                 "description": data.get('description'),
                 "stock": stock,
+                "category": primary_category,
                 "image_urls": [url.strip() for url in image_urls_str.split(',')] # Split string into a list of URLs
                 ,"tags": tags
             }
