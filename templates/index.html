@@ -39,13 +39,10 @@
 </nav>
 
 <!-- Categories Bar -->
-<div class="categories-bar bg-light shadow-sm p-2 mb-4">
+<div class="popular-tags-bar bg-light shadow-sm p-2 mb-4">
     <div class="container-fluid text-center">
-        <button class="btn btn-outline-secondary category-btn active" data-category="all">All</button>
-        <button class="btn btn-outline-secondary category-btn" data-category="Food">Food</button>
-        <button class="btn btn-outline-secondary category-btn" data-category="Personal Care">Personal Care</button>
-        <button class="btn btn-outline-secondary category-btn" data-category="Produce">Produce</button>
-        <button class="btn btn-outline-secondary category-btn" data-category="Bakery">Bakery</button>
+        <span class="text-muted me-2">Popular Tags:</span>
+        <span id="popular-tags-container"></span>
     </div>
 </div>
 
@@ -71,14 +68,13 @@
         {% endif %}
     </div>
 
-    <!-- Purveyor CTA Section -->
-    <section class="purveyor-cta my-5">
-        <div class="card text-center">
-            <div class="card-body p-5">
-                <h2 class="card-title">Sell on Buxxel</h2>
-                <p class="card-text lead">Join our community of local purveyors and reach thousands of customers.</p>
-                <p>Benefit from our seamless platform, low fees, and dedicated support.</p>
-                <a href="#" id="create-listing-cta" class="btn btn-primary btn-lg">Create a Listing</a>
+    <!-- Purveyor CTA Section (for guests only, hidden by default) -->
+    <section id="guest-cta-section" class="my-5" style="display: none;">
+        <div class="card text-center bg-light border-0">
+            <div class="card-body p-4">
+                <h4 class="card-title">Ready to sell on Buxxel?</h4>
+                <p class="card-text">Join our community of purveyors and start reaching customers today.</p>
+                <a href="#" id="create-listing-cta" class="btn btn-warning">Create a Listing</a>
             </div>
         </div>
     </section>

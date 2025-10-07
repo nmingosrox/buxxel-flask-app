@@ -105,15 +105,9 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="editListingCategory" class="form-label">Category</label>
-                        <select class="form-select" id="editListingCategory" name="category" required>
-                            <option selected disabled value="">Choose...</option>
-                            <option>Food</option>
-                            <option>Personal Care</option>
-                            <option>Produce</option>
-                            <option>Bakery</option>
-                            <option>Other</option>
-                        </select>
+                        <label for="editListingTags" class="form-label">Tags</label>
+                        <input type="text" class="form-control" id="editListingTags" name="tags" required>
+                        <div class="form-text">Enter comma-separated tags.</div>
                     </div>
                     <div class="mb-3">
                         <label for="editListingDescription" class="form-label">Description</label>
@@ -122,7 +116,13 @@
                     <div class="mb-3">
                         <label class="form-label">Product Image</label>
                         <p class="form-text">The widget shows your current image. Upload a new one to replace it.</p>
-                        <input type="hidden" role="uploadcare-uploader" data-images-only="true" data-crop="free" id="edit-uploadcare-widget" />
+                        <input type="hidden"
+                               role="uploadcare-uploader"
+                               data-images-only="true"
+                               data-multiple="true"
+                               data-crop="free"
+                               data-image-shrink="1920x1920 80%"
+                               id="edit-uploadcare-widget" />
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Update Listing</button>
                 </form>
@@ -215,7 +215,7 @@ $(document).ready(function() {
 
                     const infoDiv = $('<div>');
                     infoDiv.append($('<h5>').addClass('card-title').text(listing.name));
-                    const smallText = `Category: ${listing.category} | Price: $${listing.price.toFixed(2)} | Stock: ${listing.stock}`;
+                    const smallText = `Tags: ${(listing.tags || []).join(', ')} | Price: $${listing.price.toFixed(2)} | Stock: ${listing.stock}`;
                     infoDiv.append($('<p>').addClass('card-text').append($('<small>').addClass('text-muted').text(smallText)));
 
                     const actionsDiv = $('<div>');
@@ -457,8 +457,8 @@ $(document).ready(function() {
                 modal.find('#editListingName').val(listing.name);
                 modal.find('#editListingPrice').val(listing.price);
                 modal.find('#editListingStock').val(listing.stock);
-                modal.find('#editListingCategory').val(listing.category);
                 modal.find('#editListingDescription').val(listing.description);
+                modal.find('#editListingTags').val((listing.tags || []).join(', '));
 
                 // Pre-fill the Uploadcare widget with the existing image URL
                 const imageUrl = (listing.image_urls && listing.image_urls.length > 0) ? listing.image_urls[0] : '';
@@ -489,9 +489,9 @@ $(document).ready(function() {
         const session = await getSession();
         if (!session) return;
 
-        const imageUrl = $('#edit-uploadcare-widget').val();
-        if (!imageUrl) {
-            alertDiv.text('Please ensure an image is uploaded.').removeClass('alert-success').addClass('alert-danger').show();
+        const imageUrls = $('#edit-uploadcare-widget').val();
+        if (!imageUrls) {
+            alertDiv.text('Please ensure at least one image is uploaded.').removeClass('alert-success').addClass('alert-danger').show();
             return;
         }
 
@@ -499,9 +499,9 @@ $(document).ready(function() {
             name: $('#editListingName').val(),
             price: $('#editListingPrice').val(),
             stock: $('#editListingStock').val(),
-            category: $('#editListingCategory').val(),
             description: $('#editListingDescription').val(),
-            image_url: imageUrl
+            image_urls: imageUrls,
+            tags: $('#editListingTags').val()
         };
 
         $.ajax({
@@ -518,7 +518,7 @@ $(document).ready(function() {
                 // Update the card on the page without reloading
                 const card = $(`#listing-card-${listingId}`);
                 card.find('.card-title').text(updatedListing.name);
-                const smallText = `Category: ${updatedListing.category} | Price: $${updatedListing.price.toFixed(2)} | Stock: ${updatedListing.stock}`;
+                const smallText = `Tags: ${(updatedListing.tags || []).join(', ')} | Price: $${updatedListing.price.toFixed(2)} | Stock: ${updatedListing.stock}`;
                 card.find('.text-muted').text(smallText);
                 const newImageUrl = (updatedListing.image_urls && updatedListing.image_urls.length > 0) ? updatedListing.image_urls[0] : '';
                 card.find('.img-fluid').attr('src', newImageUrl);

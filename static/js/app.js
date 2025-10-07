@@ -197,24 +197,44 @@ $(document).ready(function() {
         );
 
         // Get current filter state
-        const activeCategory = $('.category-btn.active').data('category');
+        const activeTag = $('.tag-btn.active').data('tag') || 'all';
         const searchTerm = $('#search-bar').val();
 
         $.ajax({
-            url: `/api/listings/paged?page=${nextPage}&category=${activeCategory}&search=${encodeURIComponent(searchTerm)}`,
+            url: `/api/listings/paged?page=${nextPage}&tag=${activeTag}&search=${encodeURIComponent(searchTerm)}`,
             type: 'GET',
             success: function(response) {
                 const listings = response.listings;
                 const pagination = response.pagination;
 
                 listings.forEach(listing => {
-                    const imageUrl = (listing.image_urls && listing.image_urls.length > 0) 
-                        ? listing.image_urls[0] 
-                        : 'https://via.placeholder.com/300x200.png?text=No+Image';
+                    const images = (listing.image_urls && listing.image_urls.length > 0) 
+                        ? listing.image_urls 
+                        : ['https://via.placeholder.com/300x200.png?text=No+Image'];
+
+                    let imageHtml;
+                    if (images.length > 1) {
+                        const carouselId = `carousel-${listing.id}`;
+                        const carouselItems = images.map((img, index) => `
+                            <div class="carousel-item ${index === 0 ? 'active' : ''}">
+                                <img src="${img}" class="d-block w-100 card-img-top" alt="${listing.name}">
+                            </div>`).join('');
+                        imageHtml = `
+                            <div id="${carouselId}" class="carousel slide" data-bs-ride="carousel">
+                                <div class="carousel-inner">${carouselItems}</div>
+                                <button class="carousel-control-prev" type="button" data-bs-target="#${carouselId}" data-bs-slide="prev"><span class="carousel-control-prev-icon" aria-hidden="true"></span><span class="visually-hidden">Previous</span></button>
+                                <button class="carousel-control-next" type="button" data-bs-target="#${carouselId}" data-bs-slide="next"><span class="carousel-control-next-icon" aria-hidden="true"></span><span class="visually-hidden">Next</span></button>
+                            </div>`;
+                    } else {
+                        imageHtml = `<img src="${images[0]}" class="card-img-top" alt="${listing.name}">`;
+                    }
+
                     const productCardHtml = `
-                        <div class="col-lg-3 col-md-4 col-sm-6 listing-card" data-category="${listing.category}" data-name="${listing.name.toLowerCase()}" data-image="${imageUrl}">
+                        <div class="col-lg-3 col-md-4 col-sm-6 listing-card" 
+                             data-tags="${(listing.tags || []).join(',')}" 
+                             data-name="${listing.name.toLowerCase()}">
                             <div class="card h-100 shadow-sm">
-                                <img src="${imageUrl}" class="card-img-top" alt="${listing.name}">
+                                ${imageHtml}
                                 <div class="card-body d-flex flex-column">
                                     <h5 class="card-title">${listing.name}</h5>
                                     <p class="card-text fw-bold fs-5 mb-3">$${listing.price.toFixed(2)}</p>
@@ -283,11 +303,11 @@ $(document).ready(function() {
     // --- FILTERING FUNCTIONALITY ---
 
     // 1. Category Filter
-    $('.category-btn').on('click', function() {
-        const category = $(this).data('category');
+    $('#popular-tags-container').on('click', '.tag-btn', function() {
+        const tag = $(this).data('tag');
 
         // Active button style
-        $('.category-btn').removeClass('active');
+        $('.tag-btn').removeClass('active');
         $(this).addClass('active');
 
         // Instead of hiding/showing, fetch new filtered data
@@ -416,26 +436,23 @@ $(document).ready(function() {
             return;
         }
         const session = data.session;
-        const createListingBtn = $('#create-listing-cta');
+        const guestCtaSection = $('#guest-cta-section');
 
         if (session && session.user) {
             // User is logged in
             $('#auth-guest').addClass('d-none');
             $('#auth-user').removeClass('d-none').addClass('d-flex');
             $('#user-email').text(session.user.email);
-
-            // CTA button on homepage should link to the create page
-            if (createListingBtn.length) {
-                createListingBtn.attr('href', '/new-listing').off('click');
-            }
+            // The guest CTA should be hidden for logged-in users
+            guestCtaSection.hide();
         } else {
             // User is a guest
             $('#auth-guest').removeClass('d-none').addClass('d-flex');
             $('#auth-user').addClass('d-none');
+            guestCtaSection.show(); // Show the CTA for guests
 
             // CTA button on homepage should open the signup modal
-            if (createListingBtn.length) {
-                createListingBtn.attr('href', '#').on('click', function(e) {
+            $('#create-listing-cta').attr('href', '#').on('click', function(e) {
                     e.preventDefault();
                     // Add the contextual message before showing the modal
                     $('#auth-context-message')
@@ -444,7 +461,6 @@ $(document).ready(function() {
                     const authModal = new bootstrap.Modal(document.getElementById('authModal'));
                     authModal.show();
                 });
-            }
         }
     }
 
@@ -472,8 +488,32 @@ $(document).ready(function() {
         $('#reset-request-alert').hide().text('');
     });
 
+    // --- POPULAR TAGS ---
+    function loadPopularTags() {
+        const container = $('#popular-tags-container');
+        if (!container.length) return;
+
+        $.ajax({
+            url: '/api/tags/popular',
+            type: 'GET',
+            success: function(tags) {
+                // Always add an "All" button first
+                container.append('<button class="btn btn-secondary tag-btn active" data-tag="all">All</button>');
+                tags.forEach(tagInfo => {
+                    const tagButton = `<button class="btn btn-outline-secondary tag-btn" data-tag="${tagInfo.tag}">${tagInfo.tag}</button>`;
+                    container.append(tagButton);
+                });
+            },
+            error: function() {
+                container.html('<span class="text-danger">Could not load popular tags.</span>');
+            }
+        });
+    }
+
     // Initial cart update on page load
     updateCart();
     // Check and update the auth state on page load
     updateAuthState();
+    // Load popular tags on the homepage
+    loadPopularTags();
 });

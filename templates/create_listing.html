@@ -22,15 +22,9 @@
                     <input type="number" class="form-control" id="listingStock" min="0" value="1" required>
                 </div>
                 <div class="mb-3">
-                    <label for="listingCategory" class="form-label">Category</label>
-                    <select class="form-select" id="listingCategory" required>
-                        <option selected disabled value="">Choose...</option>
-                        <option>Food</option>
-                        <option>Personal Care</option>
-                        <option>Produce</option>
-                        <option>Bakery</option>
-                        <option>Other</option>
-                    </select>
+                    <label for="listingTags" class="form-label">Tags</label>
+                    <input type="text" class="form-control" id="listingTags" placeholder="e.g. books, vintage, handmade" required>
+                    <div class="form-text">Enter comma-separated tags to help buyers find your item.</div>
                 </div>
                 <div class="mb-3">
                     <label for="listingDescription" class="form-label">Description</label>
@@ -42,7 +36,9 @@
                            role="uploadcare-uploader"
                            data-public-key="{{ uploadcare_public_key }}"
                            data-images-only="true"
+                           data-multiple="true"
                            data-crop="free"
+                           data-image-shrink="1920x1920 80%"
                            id="uploadcare-widget" />
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Post Listing</button>
@@ -82,10 +78,10 @@ $(document).ready(function() {
         }
 
         // Get the image URL from the Uploadcare widget's value
-        const imageUrl = $('#uploadcare-widget').val();
+        const imageUrls = $('#uploadcare-widget').val();
 
-        if (!imageUrl) {
-            alertDiv.text('Please upload an image.').removeClass('alert-success').addClass('alert-danger').show();
+        if (!imageUrls) {
+            alertDiv.text('Please upload at least one image.').removeClass('alert-success').addClass('alert-danger').show();
             return;
         }
 
@@ -93,9 +89,9 @@ $(document).ready(function() {
             name: $('#listingName').val(),
             price: $('#listingPrice').val(),
             stock: $('#listingStock').val(),
-            category: $('#listingCategory').val(),
             description: $('#listingDescription').val(),
-            image_url: imageUrl
+            image_urls: imageUrls, // This will be a comma-separated string of URLs
+            tags: $('#listingTags').val()
         };
 
         $.ajax({

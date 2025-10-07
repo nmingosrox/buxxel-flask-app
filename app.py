@@ -170,7 +170,7 @@ def get_paged_listings():
     This is used for dynamic 'load more' functionality.
     """
     page = request.args.get('page', 1, type=int)
-    category = request.args.get('category', None, type=str)
+    tag = request.args.get('tag', None, type=str) # Changed from 'category' to 'tag'
     search_term = request.args.get('search', None, type=str)
     per_page = 12
     start_index = (page - 1) * per_page
@@ -180,8 +180,8 @@ def get_paged_listings():
         query = supabase.table('listings').select("*", count='exact')
 
         # Apply filters if they are provided
-        if category and category != 'all':
-            query = query.eq('category', category)
+        if tag and tag != 'all':
+            query = query.contains('tags', [tag]) # Filter if the 'tags' array contains the given tag
         
         if search_term:
             query = query.ilike('name', f'%{search_term}%')
@@ -238,13 +238,14 @@ def create_listing(user): # The user object is now passed by the decorator
     try:
         # Get data from the form
         data = request.form
-        image_url = data.get('image_url')
+        image_urls_str = data.get('image_urls') # This will be a comma-separated string
+        tags_str = data.get('tags', '')
 
-        if not all([data.get('name'), data.get('price'), data.get('category'), data.get('description'), data.get('stock')]):
+        if not all([data.get('name'), data.get('price'), data.get('description'), data.get('stock')]):
             return jsonify({"error": "Missing required listing data."}), 400
         
-        if not image_url:
-            return jsonify({"error": "An image is required for the listing."}), 400
+        if not image_urls_str:
+            return jsonify({"error": "At least one image is required for the listing."}), 400
         
         # --- Improved Validation ---
         try:
@@ -255,11 +256,14 @@ def create_listing(user): # The user object is now passed by the decorator
         except (ValueError, TypeError):
             return jsonify({"error": "Price and stock must be valid numbers."}), 400
 
+        # Convert comma-separated string into a list of clean, lowercase tags
+        tags = [tag.strip().lower() for tag in tags_str.split(',') if tag.strip()]
+
         listing_data = {
             "name": data.get('name'),
             "price": price,
-            "category": data.get('category'),
-            "image_urls": [image_url], # Store the single URL in an array to match the DB schema
+            "image_urls": [url.strip() for url in image_urls_str.split(',')], # Split string into a list of URLs
+            "tags": tags,
             "description": data.get('description'),
             "stock": stock, 
             "pre_zero_stock": stock if stock > 0 else 1, # Initialize pre_zero_stock
@@ -358,6 +362,33 @@ def handle_listing_status(user, listing_id):
     except Exception as e:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
+@app.route('/api/tags/popular', methods=['GET'])
+def get_popular_tags():
+    """
+    Fetches and returns a list of the most frequently used tags.
+    This is a more complex query that requires a custom RPC function in Supabase.
+    """
+    try:
+        # This calls a PostgreSQL function `get_popular_tags` that you need to create in Supabase.
+        # The function unnests the tags array, counts them, and returns the top ones.
+        # See documentation for the SQL to create this function.
+        response = supabase.rpc('get_popular_tags', {'limit_count': 10}).execute()
+        
+        if response.data:
+            return jsonify(response.data), 200
+        else:
+            # If the function fails or returns no data, provide a default list.
+            default_tags = [
+                {'tag': 'electronics', 'count': 0}, {'tag': 'books', 'count': 0},
+                {'tag': 'clothing', 'count': 0}, {'tag': 'home goods', 'count': 0},
+                {'tag': 'handmade', 'count': 0}
+            ]
+            return jsonify(default_tags), 200
+
+    except Exception as e:
+        app.logger.error(f"Error fetching popular tags: {e}")
+        return jsonify({"error": "Could not load tags."}), 500
+
 @app.route('/api/listings/<listing_id>', methods=['GET', 'PUT', 'DELETE'])
 @auth_required
 def handle_listing(user, listing_id):
@@ -376,14 +407,15 @@ def handle_listing(user, listing_id):
         if request.method == 'PUT':
             # Update a listing. RLS policy will enforce ownership.
             data = request.form
-            image_url = data.get('image_url')
+            image_urls_str = data.get('image_urls')
+            tags_str = data.get('tags', '')
 
             # --- Validation ---
-            if not all([data.get('name'), data.get('price'), data.get('category'), data.get('description'), data.get('stock')]):
+            if not all([data.get('name'), data.get('price'), data.get('description'), data.get('stock')]):
                 return jsonify({"error": "Missing required listing data."}), 400
             
-            if not image_url:
-                return jsonify({"error": "A listing image is required."}), 400
+            if not image_urls_str:
+                return jsonify({"error": "At least one listing image is required."}), 400
 
             try:
                 price = float(data.get('price'))
@@ -393,13 +425,16 @@ def handle_listing(user, listing_id):
             except (ValueError, TypeError):
                 return jsonify({"error": "Price and stock must be valid numbers."}), 400
 
+            # Convert comma-separated string into a list of clean, lowercase tags
+            tags = [tag.strip().lower() for tag in tags_str.split(',') if tag.strip()]
+
             update_data = {
                 "name": data.get('name'),
                 "price": price,
-                "category": data.get('category'),
                 "description": data.get('description'),
                 "stock": stock,
-                "image_urls": [image_url] # Store as an array
+                "image_urls": [url.strip() for url in image_urls_str.split(',')] # Split string into a list of URLs
+                ,"tags": tags
             }
 
             response = supabase.table('listings').update(update_data).eq('id', listing_id).eq('user_id', user.id).execute()
