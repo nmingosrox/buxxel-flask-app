@@ -210,9 +210,13 @@ $(document).ready(function() {
                 listings.forEach(listing => {
                     const imageUrl = (listing.image_urls && listing.image_urls.length > 0) 
                         ? listing.image_urls[0] 
-                        : ['https://via.placeholder.com/300x200.png?text=No+Image'];
+                        : 'https://via.placeholder.com/300x200.png?text=No+Image';
 
-                    const imageHtml = `<img src="${imageUrl}" class="card-img-top" alt="${listing.name}">`;
+                    const imageHtml = `
+                        <a href="#" class="image-preview-trigger" data-bs-toggle="modal" data-bs-target="#imagePreviewModal" data-image-url="${imageUrl}">
+                            <img src="${imageUrl}" class="card-img-top" alt="${listing.name}">
+                        </a>
+                    `;
 
                     const productCardHtml = `
                         <div class="col-lg-3 col-md-4 col-sm-6 listing-card" 
@@ -506,4 +510,13 @@ $(document).ready(function() {
     // Load popular tags on the homepage
     loadPopularTags();
 
+    // --- IMAGE PREVIEW MODAL HANDLER ---
+    // Use event delegation on the body to catch clicks from any listing card on any page
+    $('body').on('click', '.image-preview-trigger', function(e) {
+        e.preventDefault();
+        const imageUrl = $(this).data('image-url');
+        if (imageUrl) {
+            $('#imagePreviewSrc').attr('src', imageUrl);
+        }
+    });
 });
