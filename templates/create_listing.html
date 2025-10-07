@@ -36,7 +36,6 @@
                            role="uploadcare-uploader"
                            data-public-key="{{ uploadcare_public_key }}"
                            data-images-only="true"
-                           data-multiple="true"
                            data-crop="free"
                            data-image-shrink="1920x1920 80%"
                            id="uploadcare-widget" />
@@ -78,10 +77,10 @@ $(document).ready(function() {
         }
 
         // Get the image URL from the Uploadcare widget's value
-        const imageUrls = $('#uploadcare-widget').val();
+        const imageUrl = $('#uploadcare-widget').val();
 
-        if (!imageUrls) {
-            alertDiv.text('Please upload at least one image.').removeClass('alert-success').addClass('alert-danger').show();
+        if (!imageUrl) {
+            alertDiv.text('Please upload an image.').removeClass('alert-success').addClass('alert-danger').show();
             return;
         }
 
@@ -90,7 +89,7 @@ $(document).ready(function() {
             price: $('#listingPrice').val(),
             stock: $('#listingStock').val(),
             description: $('#listingDescription').val(),
-            image_urls: imageUrls, // This will be a comma-separated string of URLs
+            image_url: imageUrl,
             tags: $('#listingTags').val()
         };
 

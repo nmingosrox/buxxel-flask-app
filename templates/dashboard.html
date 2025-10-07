@@ -119,7 +119,6 @@
                         <input type="hidden"
                                role="uploadcare-uploader"
                                data-images-only="true"
-                               data-multiple="true"
                                data-crop="free"
                                data-image-shrink="1920x1920 80%"
                                id="edit-uploadcare-widget" />
@@ -489,9 +488,9 @@ $(document).ready(function() {
         const session = await getSession();
         if (!session) return;
 
-        const imageUrls = $('#edit-uploadcare-widget').val();
-        if (!imageUrls) {
-            alertDiv.text('Please ensure at least one image is uploaded.').removeClass('alert-success').addClass('alert-danger').show();
+        const imageUrl = $('#edit-uploadcare-widget').val();
+        if (!imageUrl) {
+            alertDiv.text('Please ensure an image is uploaded.').removeClass('alert-success').addClass('alert-danger').show();
             return;
         }
 
@@ -500,7 +499,7 @@ $(document).ready(function() {
             price: $('#editListingPrice').val(),
             stock: $('#editListingStock').val(),
             description: $('#editListingDescription').val(),
-            image_urls: imageUrls,
+            image_url: imageUrl,
             tags: $('#editListingTags').val()
         };
 

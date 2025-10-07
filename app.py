@@ -82,20 +82,20 @@ def home():
     # The 'load more' button and subsequent loads are handled by the '/api/listings/paged' endpoint.
     per_page = 12 
     try:
-        print("Attempting to fetch listings from Supabase...")
-        response = supabase.table('listings').select("*", count='exact').order('id').limit(per_page).execute()
-        listings = response.data
+        # We only need to check if there are any listings to determine if the "Load More" button should be shown.
+        # The actual data will be fetched by the frontend.
+        print("Checking for initial listings...")
+        response = supabase.table('listings').select("id", count='exact').limit(1).execute()
         total_listings = response.count
-        has_next = total_listings > per_page
+        has_next = total_listings > 0 # If there's at least one listing, we can try to load more.
         
-        print(f"✅ Successfully fetched initial {len(listings)} listings.")
-        return render_template('index.html', listings=listings, has_next=has_next)
+        print(f"✅ Initial listing check complete. Total: {total_listings}.")
+        return render_template('index.html', has_next=has_next)
 
     except Exception as e:
         print(f"❌ Failed to connect to Supabase or fetch listings: {e}")
         print("   Please check your .env file and Supabase table permissions.")
-        # Render the page with an empty list so it doesn't crash
-        return render_template('index.html', listings=[], page=1, has_next=False, has_prev=False)
+        return render_template('index.html', has_next=False, error="Could not connect to the database.")
 
 @app.route('/new-listing')
 def new_listing_page():
@@ -238,14 +238,14 @@ def create_listing(user): # The user object is now passed by the decorator
     try:
         # Get data from the form
         data = request.form
-        image_urls_str = data.get('image_urls') # This will be a comma-separated string
+        image_url = data.get('image_url')
         tags_str = data.get('tags', '')
 
         if not all([data.get('name'), data.get('price'), data.get('description'), data.get('stock')]):
             return jsonify({"error": "Missing required listing data."}), 400
         
-        if not image_urls_str:
-            return jsonify({"error": "At least one image is required for the listing."}), 400
+        if not image_url:
+            return jsonify({"error": "An image is required for the listing."}), 400
         
         # --- Improved Validation ---
         try:
@@ -266,7 +266,7 @@ def create_listing(user): # The user object is now passed by the decorator
         listing_data = {
             "name": data.get('name'),
             "price": price,
-            "image_urls": [url.strip() for url in image_urls_str.split(',')], # Split string into a list of URLs
+            "image_urls": [image_url], # Store the single URL in an array
             "tags": tags,
             "category": primary_category,
             "description": data.get('description'),
@@ -412,15 +412,15 @@ def handle_listing(user, listing_id):
         if request.method == 'PUT':
             # Update a listing. RLS policy will enforce ownership.
             data = request.form
-            image_urls_str = data.get('image_urls')
+            image_url = data.get('image_url')
             tags_str = data.get('tags', '')
 
             # --- Validation ---
             if not all([data.get('name'), data.get('price'), data.get('description'), data.get('stock')]):
                 return jsonify({"error": "Missing required listing data."}), 400
             
-            if not image_urls_str:
-                return jsonify({"error": "At least one listing image is required."}), 400
+            if not image_url:
+                return jsonify({"error": "A listing image is required."}), 400
 
             try:
                 price = float(data.get('price'))
@@ -442,7 +442,7 @@ def handle_listing(user, listing_id):
                 "description": data.get('description'),
                 "stock": stock,
                 "category": primary_category,
-                "image_urls": [url.strip() for url in image_urls_str.split(',')] # Split string into a list of URLs
+                "image_urls": [image_url]
                 ,"tags": tags
             }
 

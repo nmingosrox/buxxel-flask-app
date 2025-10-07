@@ -208,26 +208,11 @@ $(document).ready(function() {
                 const pagination = response.pagination;
 
                 listings.forEach(listing => {
-                    const images = (listing.image_urls && listing.image_urls.length > 0) 
-                        ? listing.image_urls 
+                    const imageUrl = (listing.image_urls && listing.image_urls.length > 0) 
+                        ? listing.image_urls[0] 
                         : ['https://via.placeholder.com/300x200.png?text=No+Image'];
 
-                    let imageHtml;
-                    if (images.length > 1) {
-                        const carouselId = `carousel-${listing.id}`;
-                        const carouselItems = images.map((img, index) => `
-                            <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                                <img src="${img}" class="d-block w-100 card-img-top" alt="${listing.name}">
-                            </div>`).join('');
-                        imageHtml = `
-                            <div id="${carouselId}" class="carousel slide" data-bs-ride="carousel">
-                                <div class="carousel-inner">${carouselItems}</div>
-                                <button class="carousel-control-prev" type="button" data-bs-target="#${carouselId}" data-bs-slide="prev"><span class="carousel-control-prev-icon" aria-hidden="true"></span><span class="visually-hidden">Previous</span></button>
-                                <button class="carousel-control-next" type="button" data-bs-target="#${carouselId}" data-bs-slide="next"><span class="carousel-control-next-icon" aria-hidden="true"></span><span class="visually-hidden">Next</span></button>
-                            </div>`;
-                    } else {
-                        imageHtml = `<img src="${images[0]}" class="card-img-top" alt="${listing.name}">`;
-                    }
+                    const imageHtml = `<img src="${imageUrl}" class="card-img-top" alt="${listing.name}">`;
 
                     const productCardHtml = `
                         <div class="col-lg-3 col-md-4 col-sm-6 listing-card" 
@@ -279,14 +264,18 @@ $(document).ready(function() {
         });
     }
 
-    if (loadMoreContainer && document.getElementById('load-more-btn')) {
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    if (loadMoreContainer && loadMoreBtn) {
         const observer = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting) {
                 loadMoreListings(false); // isNewFilter = false
             }
         }, { threshold: 1.0 }); // Trigger when 100% of the element is visible
 
+        // Start observing the button
         observer.observe(loadMoreContainer);
+        // And trigger the first load immediately if the button is present on the page
+        loadMoreListings(true);
     }
 
     // --- UTILITY FUNCTIONS ---
@@ -516,4 +505,5 @@ $(document).ready(function() {
     updateAuthState();
     // Load popular tags on the homepage
     loadPopularTags();
+
 });
