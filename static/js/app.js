@@ -229,7 +229,7 @@ $(document).ready(function() {
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#purveyorProfileModal"
                                                 data-user-id="${listing.user_id}">
-                                            View Purveyor
+                                            View Purveyor</button>
                                         </button>
                                     </div>
                                 </div>

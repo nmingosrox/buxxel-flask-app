@@ -376,9 +376,9 @@ $(document).ready(function() {
                 $(`#listing-card-${listingId}`).fadeOut(500, function() { 
                     $(this).remove(); 
                     // After removing, check if the container is empty.
-                    if ($('#my-listings-container').children().length === 0) {
-                        // If we deleted the last item on a page, reload the current (or previous) page
-                        // to show the correct state or the "no listings" message.
+                    if ($('#my-listings-container').children().length === 0 && currentPage > 0) {
+                        // If we deleted the last item, reload the dashboard.
+                        // This will either show the previous page or the "no listings" message.
                         const searchTerm = $('#dashboard-search-bar').val();
                         const [sortBy, sortOrder] = $('#dashboard-sort-select').val().split(',');
                         loadDashboard(currentPage, searchTerm, sortBy, sortOrder);

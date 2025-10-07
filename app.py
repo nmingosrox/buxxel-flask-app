@@ -78,27 +78,18 @@ def inject_uploadcare_key():
 @app.route('/')
 def home():
     """Renders the home page by fetching listings from Supabase."""
-    # --- Pagination Logic ---
-    page = request.args.get('page', 1, type=int)
-    per_page = 12 # Show 12 listings per page
-    start_index = (page - 1) * per_page
-    end_index = start_index + per_page - 1
-
+    # The frontend uses infinite scroll, so we only need to load the first page of results initially.
+    # The 'load more' button and subsequent loads are handled by the '/api/listings/paged' endpoint.
+    per_page = 12 
     try:
-        # Fetch a paginated set of data from the 'listings' table
         print("Attempting to fetch listings from Supabase...")
-        # We also fetch a count to determine total pages
-        response = supabase.table('listings').select("*", count='exact').order('id').range(start_index, end_index).execute()
+        response = supabase.table('listings').select("*", count='exact').order('id').limit(per_page).execute()
         listings = response.data
         total_listings = response.count
-
-        # Calculate pagination details
-        has_next = end_index < total_listings - 1
-        has_prev = page > 1
+        has_next = total_listings > per_page
         
-        print(f"✅ Successfully fetched {len(listings)} listings for page {page}.")
-        return render_template('index.html', listings=listings, 
-                               page=page, has_next=has_next, has_prev=has_prev)
+        print(f"✅ Successfully fetched initial {len(listings)} listings.")
+        return render_template('index.html', listings=listings, has_next=has_next)
 
     except Exception as e:
         print(f"❌ Failed to connect to Supabase or fetch listings: {e}")
@@ -166,8 +157,11 @@ def handle_my_profile(user):
             return jsonify({"error": "Username must be at least 3 characters long."}), 400
         
         update_data = {"username": username, "updated_at": "now()"}
-        response = supabase.table('profiles').update(update_data).eq('id', user.id).execute()
-        return jsonify(response.data[0]), 200
+        try:
+            response = supabase.table('profiles').update(update_data).eq('id', user.id).execute()
+            return jsonify(response.data[0]), 200
+        except Exception as e:
+            return jsonify({"error": f"Failed to update profile: {str(e)}"}), 500
 
 @app.route('/api/listings/paged', methods=['GET'])
 def get_paged_listings():
@@ -419,10 +413,8 @@ def handle_listing(user, listing_id):
             print(f"Attempting to delete listing {listing_id} for user {user.id}...")
             response = supabase.table('listings').delete().eq('id', listing_id).eq('user_id', user.id).execute()
             
-            # --- DEBUG LOGGING ---
-            print(f"Supabase delete response: {response}")
-
-            if not response.data:
+            # A successful delete operation returns a list of the deleted items.
+            if not response.data or len(response.data) == 0:
                 return jsonify({"error": "Delete failed. Listing not found or you do not have permission."}), 404
             return jsonify({"message": "Listing deleted successfully."}), 200
 
