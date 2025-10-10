@@ -97,11 +97,6 @@ def home():
         print("   Please check your .env file and Supabase table permissions.")
         return render_template('index.html', has_next=False, error="Could not connect to the database.")
 
-@app.route('/new-listing')
-def new_listing_page():
-    """Renders the page for creating a new listing."""
-    return render_template('create_listing.html', uploadcare_public_key=UPLOADCARE_PUBLIC_KEY)
-
 @app.route('/dashboard')
 def dashboard_page():
     """Renders the user's dashboard page."""
@@ -256,6 +251,10 @@ def create_listing(user): # The user object is now passed by the decorator
         except (ValueError, TypeError):
             return jsonify({"error": "Price and stock must be valid numbers."}), 400
 
+        # --- Apply 10% Commission ---
+        commission_rate = 0.10
+        final_price = price * (1 + commission_rate)
+
         # Convert comma-separated string into a list of clean, lowercase tags
         tags = [tag.strip().lower() for tag in tags_str.split(',') if tag.strip()]
 
@@ -265,7 +264,7 @@ def create_listing(user): # The user object is now passed by the decorator
 
         listing_data = {
             "name": data.get('name'),
-            "price": price,
+            "price": final_price,
             "image_urls": [image_url], # Store the single URL in an array
             "tags": tags,
             "category": primary_category,
@@ -376,8 +375,7 @@ def get_popular_tags():
     try:
         # This calls a PostgreSQL function `get_popular_tags` that you need to create in Supabase.
         # The function unnests the tags array, counts them, and returns the top ones.
-        # See documentation for the SQL to create this function.
-        response = supabase.rpc('get_popular_tags', {'limit_count': 10}).execute()
+        response = supabase.rpc('get_popular_tags', {'limit_count': 10}).execute() # Pass the limit as a parameter
         
         if response.data:
             return jsonify(response.data), 200
@@ -430,6 +428,10 @@ def handle_listing(user, listing_id):
             except (ValueError, TypeError):
                 return jsonify({"error": "Price and stock must be valid numbers."}), 400
 
+            # --- Apply 10% Commission ---
+            commission_rate = 0.10
+            final_price = price * (1 + commission_rate)
+
             # Convert comma-separated string into a list of clean, lowercase tags
             tags = [tag.strip().lower() for tag in tags_str.split(',') if tag.strip()]
 
@@ -438,7 +440,7 @@ def handle_listing(user, listing_id):
 
             update_data = {
                 "name": data.get('name'),
-                "price": price,
+                "price": final_price,
                 "description": data.get('description'),
                 "stock": stock,
                 "category": primary_category,

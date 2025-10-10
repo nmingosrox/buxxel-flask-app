@@ -16,19 +16,23 @@
                 <div class="mb-3">
                     <label for="listingPrice" class="form-label">Price ($)</label>
                     <input type="number" class="form-control" id="listingPrice" step="0.01" min="0" required>
+                    <div class="form-text">The final price shown to buyers will include a 10% platform commission.</div>
                 </div>
                 <div class="mb-3">
                     <label for="listingStock" class="form-label">Available Stock (Quantity)</label>
                     <input type="number" class="form-control" id="listingStock" min="0" value="1" required>
                 </div>
                 <div class="mb-3">
-                    <label for="listingTags" class="form-label">Tags</label>
-                    <input type="text" class="form-control" id="listingTags" placeholder="e.g. books, vintage, handmade" required>
-                    <div class="form-text">Enter comma-separated tags to help buyers find your item.</div>
-                </div>
-                <div class="mb-3">
                     <label for="listingDescription" class="form-label">Description</label>
                     <textarea class="form-control" id="listingDescription" rows="4" placeholder="Provide details about your item..." required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="listingTags" class="form-label">Tags</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="listingTags" placeholder="e.g. books, vintage, handmade" required>
+                        <button class="btn btn-outline-secondary" type="button" id="generate-tags-btn">Generate Tags with AI</button>
+                    </div>
+                    <div class="form-text">Enter comma-separated tags or generate them from your description.</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Product Image</label>

@@ -4,9 +4,14 @@
 <div class="container my-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>My Dashboard</h2>
-        <a href="{{ url_for('new_listing_page') }}" class="btn btn-primary">
-            <i class="bi bi-plus-circle"></i> Add New Listing
-        </a>
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#profileSettingsModal">
+                <i class="bi bi-gear-fill"></i> Settings
+            </button>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newListingModal">
+                <i class="bi bi-plus-circle"></i> Add New Listing
+            </button>
+        </div>
     </div>
     <p>Here you can manage all the listings you have posted on Buxxel.</p>
     <hr>
@@ -15,23 +20,6 @@
     <div id="guest-message" class="alert alert-warning" style="display: none;">
         <h4>Access Denied</h4>
         <p>You must be logged in to view your dashboard. Please <a href="#" data-bs-toggle="modal" data-bs-target="#authModal">log in</a>.</p>
-    </div>
-
-    <!-- Profile Settings Section -->
-    <div id="profile-settings" style="display: none;">
-        <h4>Profile Settings</h4>
-        <form id="profileSettingsForm" class="row g-3 align-items-center mb-4">
-            <div class="col-md-5">
-                <label for="usernameInput" class="form-label">Public Username</label>
-                <input type="text" class="form-control" id="usernameInput" placeholder="Enter a public username">
-                <div class="form-text">This will be displayed on your public profile page.</div>
-            </div>
-            <div class="col-md-3 align-self-end">
-                <button type="submit" class="btn btn-secondary">Save Username</button>
-            </div>
-            <div id="profile-alert" class="col-12 mt-2" style="display: none;"></div>
-        </form>
-        <hr>
     </div>
 
     <!-- Container for listings -->
@@ -77,6 +65,80 @@
     </div>
 </div>
 
+<!-- Profile Settings Modal -->
+<div class="modal fade" id="profileSettingsModal" tabindex="-1" aria-labelledby="profileSettingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="profileSettingsModalLabel">Profile Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="profileSettingsForm">
+                    <div id="profile-alert" class="alert" role="alert" style="display: none;"></div>
+                    <div class="mb-3">
+                        <label for="usernameInput" class="form-label">Public Username</label>
+                        <input type="text" class="form-control" id="usernameInput" placeholder="Enter a public username">
+                        <div class="form-text">This will be displayed on your public profile page.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Save Username</button>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- New Listing Modal -->
+<div class="modal fade" id="newListingModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="newListingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="newListingModalLabel">Create a New Listing</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="newListingForm" enctype="multipart/form-data">
+                    <div id="new-listing-alert" class="alert" role="alert" style="display: none;"></div>
+                    <div class="mb-3">
+                        <label for="newListingName" class="form-label">Listing Name</label>
+                        <input type="text" class="form-control" id="newListingName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newListingPrice" class="form-label">Price ($)</label>
+                        <input type="number" class="form-control" id="newListingPrice" step="0.01" min="0" required>
+                        <div class="form-text">The final price shown to buyers will include a 10% platform commission.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newListingStock" class="form-label">Available Stock (Quantity)</label>
+                        <input type="number" class="form-control" id="newListingStock" min="0" value="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newListingDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="newListingDescription" rows="4" placeholder="Provide details about your item..." required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newListingTags" class="form-label">Tags</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="newListingTags" placeholder="e.g. books, vintage, handmade" required>
+                            <button class="btn btn-outline-secondary" type="button" id="generate-tags-btn">Generate Tags with AI</button>
+                        </div>
+                        <div class="form-text">Enter comma-separated tags or generate them from your description.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Product Image</label>
+                        <input type="hidden" role="uploadcare-uploader" data-public-key="{{ uploadcare_public_key }}" data-images-only="true" data-crop="free" data-image-shrink="1920x1920 80%" id="new-uploadcare-widget" />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Post Listing</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Edit Listing Modal -->
 <div class="modal fade" id="editListingModal" tabindex="-1" aria-labelledby="editListingModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -98,6 +160,7 @@
                         <div class="col-md-6 mb-3">
                             <label for="editListingPrice" class="form-label">Price ($)</label>
                             <input type="number" class="form-control" id="editListingPrice" name="price" step="0.01" min="0" required>
+                            <div class="form-text">Enter your desired price. A 10% commission will be added to the final price.</div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="editListingStock" class="form-label">Available Stock</label>
@@ -105,13 +168,16 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="editListingTags" class="form-label">Tags</label>
-                        <input type="text" class="form-control" id="editListingTags" name="tags" required>
-                        <div class="form-text">Enter comma-separated tags.</div>
-                    </div>
-                    <div class="mb-3">
                         <label for="editListingDescription" class="form-label">Description</label>
                         <textarea class="form-control" id="editListingDescription" name="description" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editListingTags" class="form-label">Tags</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="editListingTags" name="tags" required>
+                            <button class="btn btn-outline-secondary" type="button" id="edit-generate-tags-btn">Generate Tags with AI</button>
+                        </div>
+                        <div class="form-text">Enter comma-separated tags or generate them from your description.</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Product Image</label>
@@ -160,7 +226,6 @@ $(document).ready(function() {
 
         if (!session) {
             $('#guest-message').show();
-            $('#profile-settings').hide();
             $('#loading-spinner').hide();
             return;
         }
@@ -197,11 +262,12 @@ $(document).ready(function() {
                 $('#no-listings-message').hide();
 
                 listings.forEach(listing => {
-                    // Use the first image from the 'image_urls' array
+                    // Use the first image from the 'image_urls' array and encode the description
                     const imageUrl = (listing.image_urls && listing.image_urls.length > 0) ? listing.image_urls[0] : 'https://via.placeholder.com/300x200.png?text=No+Image';
+                    const encodedDescription = escape(listing.description);
                     
                     // Safely create DOM elements to prevent XSS
-                    const card = $('<div>').addClass('card mb-3').attr('id', `listing-card-${listing.id}`);
+                    const card = $('<div>').addClass('card mb-3 listing-card').attr('id', `listing-card-${listing.id}`).attr('data-description', encodedDescription);
                     const row = $('<div>').addClass('row g-0');
 
                     const imgCol = $('<div>').addClass('col-md-2');
@@ -311,8 +377,6 @@ $(document).ready(function() {
         const session = await getSession();
         if (!session) return;
 
-        $('#profile-settings').show();
-
         $.ajax({
             url: '/api/me/profile',
             type: 'GET',
@@ -344,11 +408,14 @@ $(document).ready(function() {
                 xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
             },
             success: function(response) {
-                alertDiv.html('<div class="alert alert-success">Username updated successfully!</div>').show().delay(3000).fadeOut();
+                alertDiv.text('Username updated successfully!').removeClass('alert-danger').addClass('alert-success').show();
+                setTimeout(() => {
+                    $('#profileSettingsModal').modal('hide');
+                }, 2000);
             },
             error: function(xhr) {
                 const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'An error occurred.';
-                alertDiv.html(`<div class="alert alert-danger">${errorMsg}</div>`).show();
+                alertDiv.text(errorMsg).removeClass('alert-success').addClass('alert-danger').show();
             }
         });
     });
@@ -458,8 +525,12 @@ $(document).ready(function() {
                 xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
             },
             success: function(listing) {
+                // To show the seller their original price, we calculate it back from the final price.
+                const commission_rate = 0.10;
+                const original_price = listing.price / (1 + commission_rate);
+
                 modal.find('#editListingName').val(listing.name);
-                modal.find('#editListingPrice').val(listing.price);
+                modal.find('#editListingPrice').val(original_price.toFixed(2));
                 modal.find('#editListingStock').val(listing.stock);
                 modal.find('#editListingDescription').val(listing.description);
                 modal.find('#editListingTags').val((listing.tags || []).join(', '));
@@ -531,6 +602,64 @@ $(document).ready(function() {
                     $('#editListingModal').modal('hide');
                     alertDiv.hide().text('');
                     submitBtn.prop('disabled', false).html(originalBtnHtml);
+                }, 1500);
+            },
+            error: function(xhr) {
+                const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'An error occurred.';
+                alertDiv.text(errorMsg).removeClass('alert-success').addClass('alert-danger').show();
+                submitBtn.prop('disabled', false).html(originalBtnHtml);
+            }
+        });
+    });
+
+    // --- NEW LISTING MODAL LOGIC ---
+
+    // Reset the form and Uploadcare widget when the modal is closed
+    $('#newListingModal').on('hidden.bs.modal', function () {
+        $('#newListingForm')[0].reset();
+        uploadcare.Widget('#new-uploadcare-widget').value(null);
+        $('#new-listing-alert').hide().text('');
+    });
+
+    $('#newListingForm').on('submit', async function(event) {
+        event.preventDefault();
+
+        const form = $(this);
+        const submitBtn = form.find('button[type="submit"]');
+        const originalBtnHtml = submitBtn.html();
+        const alertDiv = $('#new-listing-alert');
+
+        const session = await getSession();
+        if (!session) return;
+
+        const imageUrl = $('#new-uploadcare-widget').val();
+        if (!imageUrl) {
+            alertDiv.text('Please upload an image.').removeClass('alert-success').addClass('alert-danger').show();
+            return;
+        }
+
+        const listingData = {
+            name: $('#newListingName').val(),
+            price: $('#newListingPrice').val(),
+            stock: $('#newListingStock').val(),
+            description: $('#newListingDescription').val(),
+            image_url: imageUrl,
+            tags: $('#newListingTags').val()
+        };
+
+        $.ajax({
+            beforeSend: function(xhr) {
+                submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Posting...');
+                xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
+            },
+            url: '/api/listings',
+            type: 'POST',
+            data: listingData,
+            success: function(response) {
+                alertDiv.text('Listing created successfully!').removeClass('alert-danger').addClass('alert-success').show();
+                setTimeout(() => {
+                    $('#newListingModal').modal('hide');
+                    loadDashboard(1); // Reload the dashboard to show the new listing
                 }, 1500);
             },
             error: function(xhr) {

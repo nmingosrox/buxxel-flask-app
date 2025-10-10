@@ -221,7 +221,8 @@ $(document).ready(function() {
                     const productCardHtml = `
                         <div class="col-lg-3 col-md-4 col-sm-6 listing-card" 
                              data-tags="${(listing.tags || []).join(',')}" 
-                             data-name="${listing.name.toLowerCase()}">
+                             data-name="${listing.name.toLowerCase()}"
+                             data-description="${escape(listing.description)}">
                             <div class="card h-100 shadow-sm">
                                 ${imageHtml}
                                 <div class="card-body d-flex flex-column">
@@ -503,20 +504,49 @@ $(document).ready(function() {
         });
     }
 
+    // --- GEOLOCATION ---
+    function loadUserLocation() {
+        const locationDisplay = $('#location-display');
+        if (!locationDisplay.length) return;
+
+        // Use a free IP-based geolocation service
+        $.ajax({
+            url: 'http://ip-api.com/json',
+            type: 'GET',
+            success: function(response) {
+                if (response && response.status === 'success' && response.city) {
+                    const locationText = `Delivering to: ${response.city}, ${response.countryCode}`;
+                    locationDisplay.text(locationText).removeClass('d-none');
+                }
+            },
+            error: function() {
+                // Silently fail if the API call doesn't work. No need to show an error.
+                console.log("Could not retrieve user location via IP.");
+            }
+        });
+    }
+
     // Initial cart update on page load
     updateCart();
     // Check and update the auth state on page load
     updateAuthState();
     // Load popular tags on the homepage
     loadPopularTags();
+    // Load user's general location
+    loadUserLocation();
 
     // --- IMAGE PREVIEW MODAL HANDLER ---
     // Use event delegation on the body to catch clicks from any listing card on any page
     $('body').on('click', '.image-preview-trigger', function(e) {
         e.preventDefault();
         const imageUrl = $(this).data('image-url');
+        // Find the parent listing card and get its description data
+        const description = unescape($(this).closest('.listing-card').data('description') || '');
+
         if (imageUrl) {
             $('#imagePreviewSrc').attr('src', imageUrl);
         }
+        // Set the description text in the modal footer
+        $('#imagePreviewDescription').text(description);
     });
 });
